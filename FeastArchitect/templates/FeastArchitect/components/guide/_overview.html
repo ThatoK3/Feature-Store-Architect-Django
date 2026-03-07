@@ -1,0 +1,171 @@
+<!-- OVERVIEW CONTEXT -->
+<div class="guide-content active" id="guide-overview">
+    <div class="guide-hero">
+        <div class="guide-hero-icon">🏗️</div>
+        <h2>Feature Architect Store</h2>
+        <p>Visual design tool for Feast feature stores with collaborative architecture planning, 
+        code generation, and LLM-powered assistance. Bridge the gap between data infrastructure 
+        and machine learning with intuitive drag-and-drop design.</p>
+    </div>
+
+    <div class="guide-grid">
+        <div class="guide-card">
+            <div class="guide-card-icon">🎯</div>
+            <h3>Visual Design</h3>
+            <p>Drag-and-drop interface for designing feature store architectures. 
+            Connect data sources to entities, feature views, and services with automatic validation.</p>
+        </div>
+        <div class="guide-card">
+            <div class="guide-card-icon">💻</div>
+            <h3>Code Generation</h3>
+            <p>Auto-generate production-ready Python code for Feast entities, feature views, 
+            and services. Export complete repository structures with proper documentation.</p>
+        </div>
+        <div class="guide-card">
+            <div class="guide-card-icon">🤖</div>
+            <h3>AI Assistant</h3>
+            <p>LLM-powered guidance for architecture decisions, optimization suggestions, 
+            and data lineage analysis. Get real-time feedback on your design patterns.</p>
+        </div>
+        <div class="guide-card">
+            <div class="guide-card-icon">🔐</div>
+            <h3>Access Control</h3>
+            <p>Built-in ownership tracking, access process documentation, and column-level 
+            security. Integrate with Django permissions for enterprise governance.</p>
+        </div>
+    </div>
+
+    <div class="guide-section">
+        <div class="guide-title">Architecture Overview</div>
+        <div class="mermaid-container">
+            <pre class="mermaid">
+flowchart TB
+    subgraph DataSources["Data Sources Layer"]
+        PG[(PostgreSQL)]
+        MG[(MongoDB)]
+        KF[/Kafka/]
+        S3[(S3 Data Lake)]
+        RD[(Redis)]
+    end
+    
+    subgraph Ingestion["Ingestion Layer"]
+        DBZ[Debezium CDC]
+        SP[Spark Streaming]
+        BATCH[Batch Jobs]
+    end
+    
+    subgraph FeastCore["Feast Core"]
+        REG[(Registry)]
+        OFF[(Offline Store<br/>Snowflake/Postgres)]
+        ON[(Online Store<br/>Redis/DynamoDB)]
+    end
+    
+    subgraph Serving["Serving Layer"]
+        API[Feature Server API]
+        SDK[Python/Go/Java SDK]
+    end
+    
+    subgraph Consumers["ML Consumers"]
+        TRAIN[Training Pipelines]
+        INF[Real-time Inference]
+        BATCH_PRED[Batch Prediction]
+    end
+    
+    PG --> DBZ --> KF --> SP --> OFF
+    PG --> BATCH --> OFF
+    MG --> BATCH --> OFF
+    S3 --> BATCH --> OFF
+    
+    OFF -->|Materialize| ON
+    ON --> API --> SDK
+    
+    SDK --> TRAIN
+    SDK --> INF
+    SDK --> BATCH_PRED
+    
+    REG -.->|Metadata| OFF
+    REG -.->|Metadata| ON
+            </pre>
+        </div>
+    </div>
+
+    <div class="guide-section">
+        <div class="guide-title">The Four Core Components</div>
+        <div class="component-showcase">
+            <div class="component-item">
+                <div class="component-badge" style="background: #3b82f6;">🗄️</div>
+                <div class="component-info">
+                    <h4>Data Sources</h4>
+                    <p>30+ supported databases including PostgreSQL, MongoDB, Kafka, Snowflake, 
+                    and S3. Each with Debezium CDC support indicators and Spark integration patterns.</p>
+                    <code>FileSource, KafkaSource, PushSource</code>
+                </div>
+            </div>
+            <div class="component-item">
+                <div class="component-badge" style="background: #8b5cf6;">👤</div>
+                <div class="component-info">
+                    <h4>Entities</h4>
+                    <p>Business objects with unique join keys. The backbone of feature relationships 
+                    enabling point-in-time correct joins across different feature views.</p>
+                    <code>Entity(name="user", join_keys=["user_id"])</code>
+                </div>
+            </div>
+            <div class="component-item">
+                <div class="component-badge" style="background: #10b981;">📊</div>
+                <div class="component-info">
+                    <h4>Feature Views</h4>
+                    <p>Logical groupings of features with TTL, entities, and data sources. 
+                    Support batch, streaming, and on-demand computation modes.</p>
+                    <code>FeatureView, StreamFeatureView, OnDemandFeatureView</code>
+                </div>
+            </div>
+            <div class="component-item">
+                <div class="component-badge" style="background: #f97316;">🚀</div>
+                <div class="component-info">
+                    <h4>Feature Services</h4>
+                    <p>Model-ready feature bundles with versioning and SLA tracking. 
+                    Composite services can reference other services for layered abstractions.</p>
+                    <code>FeatureService(name="recommendation_v1")</code>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="guide-section">
+        <div class="guide-title">Quick Start Workflow</div>
+        <div class="workflow-steps">
+            <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <h4>Design Architecture</h4>
+                    <p>Use the canvas to drag data sources, define entities, and connect feature views. 
+                    The Edge Manager helps validate all connections follow Feast patterns.</p>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <h4>Configure Ownership</h4>
+                    <p>Set team ownership and access processes for each data source. 
+                    Document security requirements and column-level PII classifications.</p>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <h4>Generate Code</h4>
+                    <p>Export Python files (entities.py, feature_views.py, services.py) or 
+                    complete JSON for version control. Includes Debezium configs and Spark jobs.</p>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-number">4</div>
+                <div class="step-content">
+                    <h4>Deploy & Monitor</h4>
+                    <p>Push to Feast registry, materialize to online store, and monitor 
+                    via the Data Flow view. Track lineage and performance in real-time.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

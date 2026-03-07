@@ -1,0 +1,16 @@
+<div class="canvas-wrapper">
+    <div class="grid-background"></div>
+    <canvas id="diagramCanvas"></canvas>
+    
+    {% include "FeastArchitecture/components/_stats_bar.html" %}
+
+    <div class="mini-map" id="miniMap">
+        <canvas id="miniMapCanvas"></canvas>
+    </div>
+
+    <div class="canvas-controls">
+        <button class="canvas-btn" onclick="diagram.zoomIn()">+</button>
+        <button class="canvas-btn" onclick="diagram.zoomOut()">−</button>
+        <button class="canvas-btn" onclick="diagram.fit()">⊘</button>
+    </div>
+</div>

@@ -1,0 +1,32 @@
+<div class="code-editor-panel" id="codeEditorPanel">
+    <div class="code-editor-header">
+        <div class="code-editor-title">
+            <span>📝</span>
+            <span>Feature Repository</span>
+        </div>
+        <div class="code-editor-controls">
+            <select class="code-editor-select" id="codeFormatSelect" onchange="diagram.updateCodeEditor()">
+                <option value="python">Python Files</option>
+                <option value="json">JSON (export)</option>
+                <option value="yaml">YAML (feature_store.yaml)</option>
+            </select>
+            <button class="btn btn-sm" onclick="diagram.copyCodeEditor()">📋 Copy</button>
+            <button class="btn btn-icon" onclick="diagram.toggleCodeEditor()">✕</button>
+        </div>
+    </div>
+    <div class="code-editor-content">
+        <div class="code-editor-layout">
+            <div class="file-sidebar" id="fileSidebar"></div>
+            <div class="file-content-area">
+                <div class="file-header" id="fileHeader">
+                    <span class="file-header-icon">📄</span>
+                    <span class="file-header-name" id="currentFileName">Select a file</span>
+                    <span class="file-header-path" id="currentFilePath"></span>
+                </div>
+                <div class="code-block" style="height: calc(100% - 60px);">
+                    <pre class="code-content" id="codeEditorContent" style="white-space: pre-wrap; word-wrap: break-word;"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

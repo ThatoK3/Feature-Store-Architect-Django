@@ -1,0 +1,85 @@
+<div class="modal-overlay" id="settingsModal">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">⚙️ Settings</div>
+            <button class="modal-close" onclick="document.getElementById('settingsModal').classList.remove('active')">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="settings-section">
+                <div class="settings-title">Appearance</div>
+                <div class="setting-item">
+                    <span class="setting-label">Dark Mode</span>
+                    <div class="theme-toggle" onclick="diagram.toggleTheme()">
+                        <div class="theme-toggle-slider">
+                            <span id="settingsThemeIcon">🌙</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <div class="settings-title">Repository Info</div>
+                <div class="form-group">
+                    <label class="form-label">Repository Name</label>
+                    <input type="text" class="form-input" id="settingsRepoName" placeholder="my_feature_repo">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Repository Location</label>
+                    <input type="text" class="form-input" id="settingsRepoLocation" placeholder="/path/to/feature_repo">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Repository Description</label>
+                    <textarea class="form-textarea" id="settingsRepoDescription" placeholder="Brief description of this feature repository" rows="2"></textarea>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <div class="settings-title">Search Configuration</div>
+                <div class="setting-item">
+                    <span class="setting-label">Include Descriptions</span>
+                    <div class="toggle-switch" onclick="diagram.toggleSearchSetting('descriptions')">
+                        <div class="toggle-slider active" id="toggleDescriptions">
+                            <div class="toggle-knob"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="setting-item">
+                    <span class="setting-label">Include Tags</span>
+                    <div class="toggle-switch" onclick="diagram.toggleSearchSetting('tags')">
+                        <div class="toggle-slider active" id="toggleTags">
+                            <div class="toggle-knob"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="setting-item">
+                    <span class="setting-label">Include Used By (Applications)</span>
+                    <div class="toggle-switch" onclick="diagram.toggleSearchSetting('usedBy')">
+                        <div class="toggle-slider active" id="toggleUsedBy">
+                            <div class="toggle-knob"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="setting-item">
+                    <span class="setting-label">Include Access Process</span>
+                    <div class="toggle-switch" onclick="diagram.toggleSearchSetting('access')">
+                        <div class="toggle-slider active" id="toggleAccess">
+                            <div class="toggle-knob"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <div class="settings-title">Data Sources</div>
+                <div class="setting-item">
+                    <span class="setting-label">Default Owner Team</span>
+                    <input type="text" class="form-input" id="settingsDefaultOwner" placeholder="Data Platform Team" style="width: 200px;">
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="document.getElementById('settingsModal').classList.remove('active')">Cancel</button>
+            <button class="btn btn-primary" onclick="diagram.saveSettings()">Save Settings</button>
+        </div>
+    </div>
+</div>

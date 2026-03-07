@@ -1,0 +1,158 @@
+<!-- ML ENGINEER CONTEXT -->
+<div class="guide-content" id="guide-ml-engineer" style="display: none;">
+    <div class="guide-hero" style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);">
+        <div class="guide-hero-icon">🤖</div>
+        <h2>ML Engineer Guide</h2>
+        <p>Deploy models with reliable feature serving, manage feature transformations, 
+        and optimize serving latency. Bridge training and inference with consistent feature logic.</p>
+    </div>
+
+    <div class="guide-section">
+        <div class="guide-title">Feature Serving Architecture</div>
+        <div class="mermaid-container">
+            <pre class="mermaid">
+flowchart TB
+    subgraph Training["Training Pipeline"]
+        HIST[Historical Features<br/>Point-in-Time Correct]
+        MODEL[Model Training]
+        REG[Model Registry]
+    end
+    
+    subgraph Serving["Real-time Serving"]
+        FEAT[Feature Retrieval]
+        TRANS[On-Demand Transform]
+        PRED[Prediction]
+    end
+    
+    subgraph Stores["Feature Stores"]
+        OFF[(Offline Store<br/>Batch/Historical)]
+        ON[(Online Store<br/>Low Latency)]
+    end
+    
+    OFF -->|get_historical_features| HIST
+    HIST --> MODEL --> REG --> PRED
+    ON -->|get_online_features| FEAT
+    FEAT --> TRANS --> PRED
+    
+    style ON fill:#ef4444,color:#fff
+    style OFF fill:#3b82f6,color:#fff
+            </pre>
+        </div>
+    </div>
+
+    <div class="guide-section">
+        <div class="guide-title">Python SDK Usage Patterns</div>
+        
+        <div class="code-comparison">
+            <div class="code-panel">
+                <div class="code-header">Batch Retrieval (Training)</div>
+                <pre class="code-content">from feast import FeatureStore
+import pandas as pd
+
+store = FeatureStore(repo_path=".")
+
+# Point-in-time correct join
+training_df = store.get_historical_features(
+    entity_df=pd.DataFrame({
+        "user_id": ["user_1", "user_2"],
+        "event_timestamp": [
+            datetime(2024, 1, 1),
+            datetime(2024, 1, 2)
+        ]
+    }),
+    features=[
+        "user_demographics:age",
+        "user_demographics:country",
+        "transaction_stats:amount_30d"
+    ]
+).to_df()</pre>
+            </div>
+            
+            <div class="code-panel">
+                <div class="code-header">Online Retrieval (Inference)</div>
+                <pre class="code-content">from feast import FeatureStore
+
+store = FeatureStore(repo_path=".")
+
+# Low-latency feature lookup
+features = store.get_online_features(
+    feature_service="recommendation_v1",
+    entity_rows=[
+        {"user_id": "user_123", "context": "mobile"}
+    ]
+).to_dict()
+
+# On-demand transformation
+prediction = model.predict(
+    features["user_demographics:age"],
+    features["transaction_stats:amount_30d"]
+)</pre>
+            </div>
+        </div>
+    </div>
+
+    <div class="guide-section">
+        <div class="guide-title">Feature Transformation Strategies</div>
+        <div class="strategy-cards">
+            <div class="strategy-card">
+                <div class="strategy-header" style="background: #10b981;">
+                    <span>Pre-computed</span>
+                    <span class="latency-badge">&lt; 10ms</span>
+                </div>
+                <div class="strategy-body">
+                    <p>Transformations applied during ingestion or materialization. 
+                    Best for: Aggregations, embeddings, complex SQL.</p>
+                    <code>FeatureView with SQL transformation</code>
+                </div>
+            </div>
+            <div class="strategy-card">
+                <div class="strategy-header" style="background: #f59e0b;">
+                    <span>On-Demand</span>
+                    <span class="latency-badge">&lt; 50ms</span>
+                </div>
+                <div class="strategy-body">
+                    <p>Computed at request time using request context. 
+                    Best for: Time-since features, personalization logic.</p>
+                    <code>OnDemandFeatureView with Python transform</code>
+                </div>
+            </div>
+            <div class="strategy-card">
+                <div class="strategy-header" style="background: #8b5cf6;">
+                    <span>Hybrid</span>
+                    <span class="latency-badge">Variable</span>
+                </div>
+                <div class="strategy-body">
+                    <p>Combine pre-computed base features with on-demand overlays. 
+                    Best for: Real-time personalization with historical context.</p>
+                    <code>Feature Service composition</code>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="guide-section">
+        <div class="guide-title">Performance Optimization</div>
+        <ul class="optimization-list">
+            <li>
+                <strong>Online Store Selection</strong>
+                <p>Redis for sub-5ms latency, DynamoDB for AWS-native, 
+                Bigtable for Google Cloud. Consider data size vs. latency requirements.</p>
+            </li>
+            <li>
+                <strong>Feature TTL Tuning</strong>
+                <p>Set aggressive TTLs for volatile features (1 hour for session data), 
+                longer for stable attributes (30 days for demographics).</p>
+            </li>
+            <li>
+                <strong>Materialization Strategy</strong>
+                <p>Incremental materialization for large datasets. 
+                Schedule during off-peak hours for batch updates.</p>
+            </li>
+            <li>
+                <strong>Embedding Caching</strong>
+                <p>Cache computed embeddings in the online store 
+                rather than computing on each request.</p>
+            </li>
+        </ul>
+    </div>
+</div>

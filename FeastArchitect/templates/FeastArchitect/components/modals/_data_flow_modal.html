@@ -1,0 +1,50 @@
+<div class="modal-overlay" id="dataFlowModal">
+    <div class="modal modal-xl">
+        <div class="modal-header">
+            <div class="modal-title">🌊 Data Source Architecture</div>
+            <button class="modal-close" onclick="document.getElementById('dataFlowModal').classList.remove('active')">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="guide-section">
+                <div class="guide-title">Complete Data Flow</div>
+                <p class="guide-text">Visual guide showing data journey from source to feature store:</p>
+            </div>
+
+            <div id="dataFlowStages"></div>
+
+            <div class="guide-section" style="margin-top: 24px;">
+                <div class="guide-title">Connection Health</div>
+                <div class="detail-card">
+                    <div class="detail-row">
+                        <span class="detail-label">Debezium Connector</span>
+                        <span class="status-indicator status-healthy">
+                            <span class="status-green" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block;"></span>
+                            Healthy
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Kafka Topic</span>
+                        <span class="status-indicator status-healthy">
+                            <span class="status-green" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block;"></span>
+                            Healthy
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Spark Streaming</span>
+                        <span class="status-indicator status-warning">
+                            <span class="status-yellow" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block;"></span>
+                            High Latency
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Postgres Store</span>
+                        <span class="status-indicator status-healthy">
+                            <span class="status-green" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block;"></span>
+                            Healthy
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

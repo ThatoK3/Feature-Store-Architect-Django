@@ -1,0 +1,198 @@
+<!-- BACKEND API CONTEXT -->
+<div class="guide-content" id="guide-backend" style="display: none;">
+    <div class="guide-hero" style="background: linear-gradient(135deg, #64748b 0%, #475569 100%);">
+        <div class="guide-hero-icon">🔧</div>
+        <h2>Backend API Reference</h2>
+        <p>Django REST Framework API with hash-based conflict detection, 
+        audit logging, and LLM integration. Designed for enterprise feature store management.</p>
+    </div>
+
+    <div class="guide-section">
+        <div class="guide-title">API Architecture</div>
+        <div class="mermaid-container">
+            <pre class="mermaid">
+flowchart TB
+    subgraph Client["Client Layer"]
+        UI[React/Vue UI]
+        CLI[Python CLI]
+        SDK[Feast SDK]
+    end
+    
+    subgraph API["Django REST API"]
+        AUTH[Authentication]
+        RATE[Rate Limiting]
+        VIEW[ViewSets]
+        SERIAL[Serializers]
+    end
+    
+    subgraph Services["Business Logic"]
+        REPO[Repository Service]
+        SYNC[Sync Service]
+        LLM[LLM Client<br/>Groq Integration]
+        AUDIT[Audit Logger]
+    end
+    
+    subgraph Data["Data Layer"]
+        PG[(PostgreSQL)]
+        CACHE[(Redis Cache)]
+        FS[(File Storage)]
+    end
+    
+    UI -->|HTTP/JSON| AUTH
+    CLI --> AUTH
+    SDK --> AUTH
+    AUTH --> RATE --> VIEW --> SERIAL
+    VIEW --> REPO
+    VIEW --> SYNC
+    VIEW --> LLM
+    REPO --> AUDIT
+    REPO --> PG
+    SYNC --> PG
+    LLM -->|API| Groq[Groq API]
+    
+    style API fill:#3b82f6,color:#fff
+    style Groq fill:#8b5cf6,color:#fff
+            </pre>
+        </div>
+    </div>
+
+    <div class="guide-section">
+        <div class="guide-title">Core Endpoints</div>
+        <div class="endpoint-list">
+            <div class="endpoint-item">
+                <div class="endpoint-method">GET/POST</div>
+                <div class="endpoint-path">/api/repositories/</div>
+                <div class="endpoint-desc">List or create feature repositories</div>
+            </div>
+            <div class="endpoint-item">
+                <div class="endpoint-method">GET/PUT/PATCH</div>
+                <div class="endpoint-path">/api/repositories/{id}/</div>
+                <div class="endpoint-desc">Retrieve or update repository with hash conflict detection</div>
+            </div>
+            <div class="endpoint-item">
+                <div class="endpoint-method">POST</div>
+
+
+                                <div class="endpoint-path">/api/repositories/{id}/sync_datasources/</div>
+                <div class="endpoint-desc">Sync data sources with architecture JSON</div>
+            </div>
+            <div class="endpoint-item">
+                <div class="endpoint-method">POST</div>
+                <div class="endpoint-path">/api/repositories/{id}/export_json/</div>
+                <div class="endpoint-desc">Export repository with hash verification</div>
+            </div>
+            <div class="endpoint-item">
+                <div class="endpoint-method">POST</div>
+                <div class="endpoint-path">/api/repositories/import_json/</div>
+                <div class="endpoint-desc">Import from JSON with duplicate detection</div>
+            </div>
+            <div class="endpoint-item">
+                <div class="endpoint-method">GET/POST</div>
+                <div class="endpoint-path">/api/datasources/</div>
+                <div class="endpoint-desc">Manage data sources with filtering by kind/repo</div>
+            </div>
+            <div class="endpoint-item">
+                <div class="endpoint-method">GET/POST</div>
+                <div class="endpoint-path">/api/entities/</div>
+                <div class="endpoint-desc">Entity definitions with repository scoping</div>
+            </div>
+            <div class="endpoint-item">
+                <div class="endpoint-method">GET</div>
+                <div class="endpoint-path">/api/audit-logs/</div>
+                <div class="endpoint-desc">Read-only audit trail with filtering</div>
+            </div>
+            <div class="endpoint-item">
+                <div class="endpoint-method">POST</div>
+                <div class="endpoint-path">/api/chats/</div>
+                <div class="endpoint-desc">Create LLM chat session with initial message</div>
+            </div>
+            <div class="endpoint-item">
+                <div class="endpoint-method">POST</div>
+                <div class="endpoint-path">/api/chats/{id}/send_message/</div>
+                <div class="endpoint-desc">Send message to existing chat session</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="guide-section">
+        <div class="guide-title">Conflict Detection & Resolution</div>
+        <div class="conflict-flow">
+            <div class="mermaid-container">
+                <pre class="mermaid">
+sequenceDiagram
+    participant Client
+    participant API
+    participant DB
+    
+    Client->>Client: Compute MD5 hash of JSON
+    Client->>API: PUT /repositories/123/ with client_hash
+    API->>DB: Fetch current hash
+    DB-->>API: server_hash
+    
+    alt Hash Match
+        API->>DB: Update repository
+        DB-->>API: Success
+        API-->>Client: 200 OK
+    else Hash Mismatch (Conflict)
+        API-->>Client: 409 Conflict
+        Note right of Client: Options:<br/>1. Fetch latest (GET)<br/>2. Force update (POST /force_update/)<br/>3. Merge changes manually
+    end
+                </pre>
+            </div>
+        </div>
+        <p>Hash-based optimistic locking prevents accidental overwrites. 
+        Each repository stores an MD5 hash of its architecture JSON. 
+        Updates include the client's hash; mismatches return 409 Conflict with resolution options.</p>
+    </div>
+
+    <div class="guide-section">
+        <div class="guide-title">Django Models</div>
+        <div class="model-hierarchy">
+            <div class="model-card primary">
+                <h4>FeastRepository</h4>
+                <p>Core container with architecture_json, json_hash, settings</p>
+            </div>
+            <div class="model-children">
+                <div class="model-card">
+                    <h4>DataSource</h4>
+                    <p>30+ DB types, Debezium support, column_security</p>
+                </div>
+                <div class="model-card">
+                    <h4>Entity</h4>
+                    <p>Join keys, descriptions, canvas positions</p>
+                </div>
+                <div class="model-card">
+                    <h4>LLMChatSession</h4>
+                    <p>Context snapshot, message history</p>
+                </div>
+            </div>
+            <div class="model-card secondary">
+                <h4>AuditLog</h4>
+                <p>Immutable record of all changes with user/IP tracking</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="guide-section">
+        <div class="guide-title">LLM Integration (Groq)</div>
+        <div class="llm-architecture">
+            <div class="mermaid-container">
+                <pre class="mermaid">
+flowchart LR
+    A[User Query] --> B[Context Builder]
+    B --> C[Prompt Engineering]
+    C --> D[Groq API<br/>llama-3.1-70b]
+    D --> E[Response Parser]
+    E --> F[Save to DB]
+    F --> G[Stream to Client]
+    
+    B -.->|Repo Context| H[(FeastRepository)]
+    
+    style D fill:#8b5cf6,color:#fff
+                </pre>
+            </div>
+        </div>
+        <p>Async LLM queries with token usage tracking. Supports streaming responses 
+        and context-aware prompts based on repository state.</p>
+    </div>
+</div>

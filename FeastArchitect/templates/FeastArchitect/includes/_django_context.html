@@ -1,0 +1,16 @@
+<script>
+    window.DJANGO_CONTEXT = {
+        repoId: {{ repo_id|default:"null" }},
+        repoName: "{{ repo_name|default:''|escapejs }}",
+        repoError: "{{ repo_error|default:''|escapejs }}",
+        apiBaseUrl: "{{ api_base_url }}",
+        user: {
+            id: {{ user.id }},
+            username: "{{ user.username|escapejs }}",
+            email: "{{ user.email|escapejs }}",
+            firstName: "{{ user.first_name|escapejs }}",
+            lastName: "{{ user.last_name|escapejs }}"
+        },
+        csrfToken: "{{ csrf_token }}"
+    };
+</script>

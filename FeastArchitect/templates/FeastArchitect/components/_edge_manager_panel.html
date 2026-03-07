@@ -1,0 +1,49 @@
+<div class="edge-manager-panel" id="edgeManagerPanel">
+    <div class="edge-manager-header">
+        <div class="edge-manager-title">
+            <span>🔗</span>
+            <span>Edge Manager</span>
+        </div>
+        <button class="btn btn-icon" onclick="diagram.toggleEdgeManager()">✕</button>
+    </div>
+    <div class="edge-manager-content" id="edgeManagerContent">
+        <div class="edge-stats">
+            <div class="edge-stat-card">
+                <div class="edge-stat-value" id="edgeCountTotal">0</div>
+                <div class="edge-stat-label">Total Connections</div>
+            </div>
+            <div class="edge-stat-card">
+                <div class="edge-stat-value" id="edgeCountValid">0</div>
+                <div class="edge-stat-label">Valid</div>
+            </div>
+            <div class="edge-stat-card">
+                <div class="edge-stat-value" id="edgeCountOrphaned">0</div>
+                <div class="edge-stat-label">Orphaned</div>
+            </div>
+        </div>
+        
+        <div class="edge-list" id="edgeList"></div>
+
+        <div class="add-edge-section">
+            <div class="add-edge-title">➕ Add New Connection</div>
+            <div class="form-group">
+                <label class="form-label">From Node</label>
+                <select class="form-select" id="edgeFromSelect">
+                    <option value="">Select source...</option>
+                </select>
+            </div>
+            <div class="edge-select-row">
+                <span style="font-size: 20px; color: var(--text-muted);">↓</span>
+            </div>
+            <div class="form-group">
+                <label class="form-label">To Node</label>
+                <select class="form-select" id="edgeToSelect">
+                    <option value="">Select target...</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" style="width: 100%; margin-top: 12px;" onclick="diagram.addEdgeFromManager()">
+                Create Connection
+            </button>
+        </div>
+    </div>
+</div>

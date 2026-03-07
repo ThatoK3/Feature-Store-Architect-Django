@@ -1,0 +1,34 @@
+<div class="modal-overlay" id="guideModal">
+    <div class="modal modal-xxl">
+        <div class="modal-header">
+            <div class="modal-title">📖 Feature Architect Store Guide</div>
+            <button class="modal-close" onclick="document.getElementById('guideModal').classList.remove('active')">×</button>
+        </div>
+        <div class="modal-body">
+            <!-- User Context Selector -->
+            <div class="guide-context-tabs">
+                <button class="context-tab active" onclick="diagram.switchGuideContext('overview')" id="tab-overview">
+                    <span>🏠</span> Overview
+                </button>
+                <button class="context-tab" onclick="diagram.switchGuideContext('data-engineer')" id="tab-data-engineer">
+                    <span>⚙️</span> Data Engineer
+                </button>
+                <button class="context-tab" onclick="diagram.switchGuideContext('ml-engineer')" id="tab-ml-engineer">
+                    <span>🤖</span> ML Engineer
+                </button>
+                <button class="context-tab" onclick="diagram.switchGuideContext('data-scientist')" id="tab-data-scientist">
+                    <span>📊</span> Data Scientist
+                </button>
+                <button class="context-tab" onclick="diagram.switchGuideContext('backend')" id="tab-backend">
+                    <span>🔧</span> Backend API
+                </button>
+            </div>
+
+            {% include "FeastArchitect/guide/_overview.html" %}
+            {% include "FeastArchitect/guide/_data_engineer.html" %}
+            {% include "FeastArchitect/guide/_ml_engineer.html" %}
+            {% include "FeastArchitect/guide/_data_scientist.html" %}
+            {% include "FeastArchitect/guide/_backend_api.html" %}
+        </div>
+    </div>
+</div>

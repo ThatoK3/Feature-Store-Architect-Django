@@ -1,0 +1,78 @@
+{% load static %}
+<div class="toolbar">
+    <div class="toolbar-brand">
+        <div class="toolbar-logo"></div>
+        <div>
+            <div class="toolbar-title">Feast Architect</div>
+            <div class="toolbar-subtitle" id="repoSubtitle">Feature Store Visualization</div>
+        </div>
+    </div>
+
+    <div class="toolbar-section hide-me">
+        <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="search-input" placeholder="Search entities, features, tags, apps..." id="searchInput" autocomplete="off">
+            <div class="search-dropdown" id="searchDropdown">
+                <div class="search-dropdown-content" id="searchDropdownContent"></div>
+            </div>
+        </div>
+
+        <div class="toolbar-divider"></div>
+
+        <button class="btn btn-icon" onclick="diagram.toggleTheme()" title="Toggle Theme">
+            <span id="themeIcon">☀️</span>
+        </button>
+
+        <button class="btn btn-icon" onclick="diagram.showSettings()" title="Settings">
+            <span>⚙️</span>
+        </button>
+
+        <button class="btn btn-icon" onclick="diagram.toggleEdgeManager()" title="Edge Manager">
+            <span>🔗</span>
+        </button>
+
+        <button class="btn btn-ai btn-icon" onclick="diagram.toggleLLMHelper()" title="AI Assistant (Ctrl+Shift+A)">
+            <span>🤖</span>
+        </button>
+
+        <button class="btn btn-icon" onclick="diagram.toggleDjangoAdmin()" title="Django Admin (Ctrl+Shift+D)">
+            <span>🎭</span>
+        </button>
+
+        <div class="toolbar-divider"></div>
+
+        <div class="view-controls">
+            <button class="layer-toggle" id="toggleSources" onclick="diagram.toggleLayer('datasource')">
+                <span class="eye-icon">👁</span>
+                <span>Sources</span>
+            </button>
+            <button class="layer-toggle" id="toggleEntities" onclick="diagram.toggleLayer('entity')">
+                <span class="eye-icon">👁</span>
+                <span>Entities</span>
+            </button>
+            <button class="layer-toggle" id="toggleViews" onclick="diagram.toggleLayer('featureview')">
+                <span class="eye-icon">👁</span>
+                <span>Views</span>
+            </button>
+            <button class="layer-toggle" id="toggleServices" onclick="diagram.toggleLayer('service')">
+                <span class="eye-icon">👁</span>
+                <span>Services</span>
+            </button>
+        </div>
+
+        <div class="toolbar-divider"></div>
+
+        <button class="btn btn-sm" onclick="diagram.showGuide()">
+            <span>📖</span>
+            <span>Guide</span>
+        </button>
+        <button class="btn btn-primary btn-sm" onclick="diagram.export()">
+            <span>💾</span>
+            <span>Export</span>
+        </button>
+        <button class="btn btn-sm" onclick="diagram.import()">
+            <span>📥</span>
+            <span>Import</span>
+        </button>
+    </div>
+</div>
