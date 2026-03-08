@@ -1,31 +1,4979 @@
-{% extends "FeastArchitect/base.html" %}
 {% load static %}
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="{% static 'FeastArchitect/images/favicon.ico' %}">   
+    <title>Feast Feature Store Architect{% if repo_name %} - {{ repo_name }}{% endif %}</title>
 
-{% block title %}Feast Feature Store Architect{% if repo_name %} - {{ repo_name }}{% endif %}{% endblock %}
+    <!-- Spark MD5 for hash computation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/spark-md5/3.0.2/spark-md5.min.js"></script>
 
-{% block content %}
-    <!-- Toolbar -->
-    {% include "FeastArchitect/components/_toolbar.html" %}
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: 'dark',
+            themeVariables: {
+                primaryColor: '#3b82f6',
+                primaryTextColor: '#fff',
+                primaryBorderColor: '#60a5fa',
+                lineColor: '#94a3b8',
+                secondaryColor: '#1e293b',
+                tertiaryColor: '#0f172a',
+                fontFamily: 'Inter, sans-serif'
+            },
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            },
+            sequence: {
+                useMaxWidth: true
+            }
+        });
+    </script>
 
-    <!-- Quick Actions -->
-    {% include "FeastArchitect/components/_quick_actions.html" %}
+    <!-- Django CSRF token for API calls -->
+    <meta name="csrf-token" content="{{ csrf_token }}">
 
-    <!-- FAB Menu -->
-    {% include "FeastArchitect/components/_fab_menu.html" %}
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    <!-- Canvas Area -->
-    {% include "FeastArchitect/components/_canvas_area.html" %}
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --bg-elevated: #1e293b;
+            --accent-primary: #3b82f6;
+            --feast-orange: #f97316;
+            --feast-blue: #3b82f6;
+            --feast-purple: #8b5cf6;
+            --feast-green: #10b981;
+            --feast-yellow: #f59e0b;
+            --feast-pink: #ec4899;
+            --feast-cyan: #06b6d4;
+            --feast-red: #ef4444;
+            --feast-indigo: #6366f1;
+            --feast-teal: #14b8a6;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --border-color: rgba(148, 163, 184, 0.2);
+            --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.5);
+            --shadow-glow: 0 0 20px rgba(249, 115, 22, 0.3);
+            --code-bg: #0b1120;
+            --grid-color: rgba(148, 163, 184, 0.05);
+        }
 
-    <!-- Side Panels (Edge Manager, LLM, Django Admin, Code Editor, Detail Panel) -->
-    {% include "FeastArchitect/components/_side_panels.html" %}
-{% endblock %}
+        [data-theme="light"] {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-tertiary: #e2e8f0;
+            --bg-elevated: #ffffff;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #94a3b8;
+            --border-color: rgba(148, 163, 184, 0.3);
+            --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.1);
+            --shadow-glow: 0 0 20px rgba(249, 115, 22, 0.2);
+            --code-bg: #f1f5f9;
+            --grid-color: rgba(148, 163, 184, 0.1);
+        }
 
-{% block modals %}
-    <!-- All Modals -->
-    {% include "FeastArchitect/components/_modals.html" %}
-{% endblock %}
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+            line-height: 1.5;
+            transition: background 0.3s, color 0.3s;
+        }
 
-{% block extra_js %}
-    <!-- Main Application JavaScript -->
-    <script type="module" src="{% static 'FeastArchitect/js/main.js' %}"></script>
-{% endblock %}
+        .app-container {
+            display: flex;
+            height: 100vh;
+            position: relative;
+        }
+
+        .toolbar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 64px;
+            background: var(--bg-secondary);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            z-index: 1000;
+            transition: all 0.3s;
+        }
+
+        .toolbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+	.hide-me {
+	    display: none
+	}
+
+        .toolbar-logo {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: url({% static 'FeastArchitect/images/disc-logo.png' %}) center / contain no-repeat;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: var(--shadow-glow);
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: transform 0.2s;
+        }
+
+        .toolbar-logo:hover {
+            transform: scale(1.1) rotate(5deg);
+        }
+
+        .toolbar-title {
+            font-size: 20px;
+            font-weight: 700;
+            background: linear-gradient(90deg, var(--feast-orange), #fbbf24);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .toolbar-subtitle {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: -2px;
+        }
+
+        .toolbar-section {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .toolbar-divider {
+            width: 1px;
+            height: 32px;
+            background: var(--border-color);
+        }
+
+        .view-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .layer-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .layer-toggle:hover {
+            border-color: var(--feast-orange);
+            color: var(--text-primary);
+        }
+
+        .layer-toggle.hidden-layer {
+            opacity: 0.5;
+            text-decoration: line-through;
+        }
+
+        .layer-toggle .eye-icon {
+            font-size: 14px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn:hover {
+            background: var(--bg-primary);
+            transform: translateY(-1px);
+            border-color: var(--feast-orange);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--feast-orange), #ea580c);
+            border-color: transparent;
+            color: white;
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 6px 20px rgba(249, 115, 22, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            border-color: transparent;
+            color: white;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .btn-icon {
+            padding: 8px;
+            font-size: 16px;
+        }
+
+        .btn-ghost {
+            background: transparent;
+            border-color: transparent;
+        }
+
+        .btn-ghost:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .btn-ai {
+            border-color: transparent;
+            color: white;
+        }
+
+        .btn-ai:hover {
+            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .btn-push {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            border-color: transparent;
+            color: white;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-push:hover {
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .canvas-wrapper {
+            flex: 1;
+            position: relative;
+            margin-top: 64px;
+            background: var(--bg-primary);
+            overflow: hidden;
+        }
+
+        .grid-background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                linear-gradient(var(--grid-color) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+            background-size: 20px 20px;
+            pointer-events: none;
+        }
+
+        #diagramCanvas {
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+            position: relative;
+            z-index: 1;
+        }
+
+        #diagramCanvas:active {
+            cursor: grabbing;
+        }
+
+        .canvas-controls {
+            position: absolute;
+            bottom: 24px;
+            right: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background: var(--bg-secondary);
+            padding: 8px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-lg);
+            z-index: 100;
+        }
+
+        .canvas-btn {
+            width: 40px;
+            height: 40px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .canvas-btn:hover {
+            background: var(--feast-orange);
+            border-color: var(--feast-orange);
+            color: white;
+            transform: scale(1.05);
+        }
+
+        .mini-map {
+            position: absolute;
+            bottom: 24px;
+            left: 24px;
+            width: 200px;
+            height: 150px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: var(--shadow-lg);
+            z-index: 100;
+        }
+
+        #miniMapCanvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .fab-menu {
+            position: absolute;
+            top: 88px;
+            left: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 100;
+        }
+
+        .fab {
+            width: 56px;
+            height: 56px;
+            border-radius: 16px;
+            border: none;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: var(--shadow-lg);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--border-color);
+            position: relative;
+        }
+
+        .fab:hover {
+            transform: scale(1.2);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .fab-primary {
+            background: linear-gradient(135deg, var(--feast-orange), #ea580c);
+            color: white;
+        }
+
+        .fab-primary:hover {
+            transform: scale(1.15);
+            box-shadow: 0 8px 30px rgba(249, 115, 22, 0.4);
+        }
+
+        .fab-label {
+            position: absolute;
+            left: 70px;
+            background: var(--bg-secondary);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            white-space: nowrap;
+            opacity: 0;
+            transform: translateX(-10px);
+            transition: all 0.2s;
+            pointer-events: none;
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .fab:hover .fab-label {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        /* Completely hideable side panel - no reserved space */
+        .side-panel {
+            position: fixed;
+            top: 64px;
+            right: 0;
+            bottom: 0;
+            width: 420px;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            z-index: 500;
+            transform: translateX(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .side-panel.open {
+            transform: translateX(0);
+        }
+
+        .panel-resize {
+            position: absolute;
+            left: -4px;
+            top: 0;
+            bottom: 0;
+            width: 8px;
+            cursor: col-resize;
+            z-index: 10;
+        }
+
+        .panel-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .panel-title-section {
+            flex: 1;
+        }
+
+        .panel-type-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .panel-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 4px;
+            line-height: 1.2;
+        }
+
+        .panel-subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .panel-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .panel-action-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .panel-action-btn:hover {
+            background: var(--feast-orange);
+            border-color: var(--feast-orange);
+            color: white;
+        }
+
+        .panel-action-btn.delete:hover {
+            background: var(--feast-red);
+            border-color: var(--feast-red);
+        }
+
+        .panel-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+        }
+
+        .panel-section {
+            margin-bottom: 28px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .section-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .section-badge {
+            padding: 2px 8px;
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .detail-card {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+
+        .detail-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .detail-value {
+            font-size: 13px;
+            color: var(--text-primary);
+            font-weight: 500;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .detail-value.highlight {
+            color: var(--feast-green);
+        }
+
+        .feature-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .feature-item:hover {
+            border-color: var(--feast-green);
+            background: rgba(16, 185, 129, 0.05);
+        }
+
+        .feature-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .feature-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--feast-green);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .feature-name {
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .feature-type {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .feature-badge {
+            padding: 4px 10px;
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--feast-green);
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .connection-graph {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .connection-node {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .connection-node:hover {
+            border-color: var(--feast-orange);
+            transform: translateX(4px);
+        }
+
+        .connection-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .connection-info {
+            flex: 1;
+        }
+
+        .connection-name {
+            font-weight: 500;
+            font-size: 14px;
+            margin-bottom: 2px;
+        }
+
+        .connection-meta {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .connection-arrow {
+            color: var(--text-muted);
+            font-size: 20px;
+        }
+
+        .notes-section {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .notes-text {
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+            white-space: pre-wrap;
+        }
+
+        .code-block {
+            background: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            position: relative;
+        }
+
+        .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .code-lang {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--feast-orange);
+            font-weight: 600;
+        }
+
+        .code-copy {
+            padding: 4px 8px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+
+        .code-content {
+            color: #e2e8f0;
+            line-height: 1.6;
+        }
+
+        [data-theme="light"] .code-content {
+            color: #1e293b;
+        }
+
+        .code-keyword { color: #c084fc; }
+        .code-string { color: #4ade80; }
+        .code-function { color: #60a5fa; }
+        .code-comment { color: #64748b; }
+        .code-class { color: #f472b6; }
+
+        .service-usage {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 12px;
+        }
+
+        .usage-card {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px;
+            text-align: center;
+            transition: all 0.2s;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .usage-card:hover {
+            border-color: var(--feast-orange);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .usage-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin: 0 auto 12px;
+        }
+
+        .usage-name {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .usage-type {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .usage-details {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--feast-orange);
+            color: white;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .usage-card:hover .usage-details {
+            opacity: 1;
+        }
+
+        .stats-bar {
+            position: absolute;
+            bottom: 24px;
+            left: 35%;
+            right: 24px; 
+            max-width: 550px; 
+            display: flex;
+            gap: 16px;
+            padding: 12px 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: var(--shadow-lg);
+            cursor: pointer;
+            transition: all 0.2s;
+            z-index: 100;
+        }
+
+        .stats-bar:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+            border-color: var(--feast-orange);
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stat-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .stat-content {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-value {
+            font-size: 18px;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .tooltip {
+            position: fixed;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            pointer-events: none;
+            z-index: 10000;
+            max-width: 320px;
+            backdrop-filter: blur(20px);
+            box-shadow: var(--shadow-lg);
+            display: none;
+        }
+
+        .tooltip-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .tooltip-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .tooltip-title-section {
+            flex: 1;
+        }
+
+        .tooltip-title {
+            font-weight: 600;
+            font-size: 15px;
+            margin-bottom: 2px;
+        }
+
+        .tooltip-subtitle {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .tooltip-section {
+            margin-bottom: 12px;
+        }
+
+        .tooltip-section-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            letter-spacing: 0.5px;
+        }
+
+        .tooltip-features {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .tooltip-feature-tag {
+            padding: 4px 8px;
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--feast-green);
+            border-radius: 4px;
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .tooltip-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .tooltip-tag {
+            padding: 2px 6px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            font-size: 10px;
+            color: var(--text-secondary);
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            backdrop-filter: blur(8px);
+            padding: 24px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            width: 100%;
+            max-width: 600px;
+            max-height: 85vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .modal-xl {
+            max-width: 900px;
+        }
+
+        .modal-xxl {
+            max-width: 1100px;
+        }
+
+        .modal-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            border: none;
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .modal-close:hover {
+            background: var(--feast-red);
+            color: white;
+        }
+
+        .modal-body {
+            padding: 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+        }
+
+        .form-input,
+        .form-select,
+        .form-textarea {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .form-input:focus,
+        .form-select:focus,
+        .form-textarea:focus {
+            outline: none;
+            border-color: var(--feast-orange);
+            box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 100px;
+            font-family: inherit;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .form-hint {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        .features-builder {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .feature-input-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .feature-input {
+            flex: 1;
+        }
+
+        .features-list-builder {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .feature-tag-builder {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: 8px;
+        }
+
+        .feature-tag-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .feature-tag-name {
+            font-weight: 500;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+        }
+
+        .feature-tag-type {
+            padding: 2px 8px;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .feature-tag-remove {
+            background: none;
+            border: none;
+            color: var(--feast-red);
+            cursor: pointer;
+            font-size: 18px;
+            padding: 0;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .feature-tag-remove:hover {
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .entity-selector {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 4px;
+        }
+
+        .entity-option {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border: 2px solid transparent;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .entity-option:hover {
+            border-color: var(--border-color);
+        }
+
+        .entity-option.selected {
+            border-color: var(--feast-purple);
+            background: rgba(139, 92, 246, 0.1);
+        }
+
+        .entity-option-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: rgba(139, 92, 246, 0.2);
+            color: var(--feast-purple);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .modal-footer {
+            padding: 20px 24px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        .guide-content {
+            line-height: 1.7;
+        }
+
+        .guide-section {
+            margin-bottom: 24px;
+        }
+
+        .guide-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: var(--feast-orange);
+        }
+
+        .guide-text {
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        .guide-code {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            margin: 12px 0;
+        }
+
+        .guide-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .guide-list li {
+            padding: 8px 0;
+            padding-left: 24px;
+            position: relative;
+            color: var(--text-secondary);
+        }
+
+        .guide-list li:before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: var(--feast-orange);
+        }
+
+        .search-box {
+            position: relative;
+        }
+
+        .search-input {
+            width: 280px;
+            padding: 10px 16px 10px 40px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--feast-orange);
+            width: 320px;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+
+        /* Search Dropdown Styles */
+        .search-dropdown {
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            width: 400px;
+            max-height: 500px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: var(--shadow-lg);
+            z-index: 10001;
+            overflow: hidden;
+            display: none;
+        }
+
+        .search-dropdown.active {
+            display: block;
+        }
+
+        .search-dropdown-header {
+            padding: 12px 16px;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .search-dropdown-content {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .search-category {
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .search-category:last-child {
+            border-bottom: none;
+        }
+
+        .search-category-header {
+            padding: 8px 16px;
+            background: rgba(249, 115, 22, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--feast-orange);
+            letter-spacing: 0.5px;
+        }
+
+        .search-category-icon {
+            font-size: 14px;
+        }
+
+        .search-result-item {
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .search-result-item:hover {
+            background: var(--bg-tertiary);
+            border-left-color: var(--feast-orange);
+        }
+
+        .search-result-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .search-result-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .search-result-name {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .search-result-meta {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .search-result-badge {
+            padding: 2px 8px;
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            font-size: 10px;
+            color: var(--text-secondary);
+            flex-shrink: 0;
+        }
+
+        .search-no-results {
+            padding: 24px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .search-highlight {
+            background: rgba(249, 115, 22, 0.3);
+            color: var(--feast-orange);
+            padding: 0 2px;
+            border-radius: 3px;
+            font-weight: 600;
+        }
+
+        .quick-actions {
+            position: absolute;
+            top: 88px;
+            right: 24px;
+            display: flex;
+            gap: 8px;
+            z-index: 100;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.3;
+        }
+
+        .empty-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(20px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .animate-in {
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .tag {
+            padding: 4px 10px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .tag.removable {
+            padding-right: 6px;
+            cursor: pointer;
+        }
+
+        .tag.removable:hover {
+            border-color: var(--feast-red);
+            color: var(--feast-red);
+        }
+
+        .tag-input {
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 11px;
+            width: 80px;
+            outline: none;
+        }
+
+        /* Code Editor Panel - Slide out from right, hidden by default */
+        .code-editor-panel {
+            position: fixed;
+            top: 64px;
+            right: 0;
+            bottom: 0;
+            width: 600px;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            z-index: 400;
+            transform: translateX(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .code-editor-panel.open {
+            transform: translateX(0);
+        }
+
+        .code-editor-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .code-editor-title {
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .code-editor-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .code-editor-select {
+            padding: 6px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .code-editor-content {
+            flex: 1;
+            overflow: auto;
+            padding: 20px;
+        }
+
+        .toggle-switch {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        .toggle-slider {
+            width: 44px;
+            height: 24px;
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            position: relative;
+            transition: background 0.2s;
+            border: 1px solid var(--border-color);
+        }
+
+        .toggle-slider.active {
+            background: var(--feast-orange);
+        }
+
+        .toggle-knob {
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 1px;
+            left: 1px;
+            transition: transform 0.2s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .toggle-slider.active .toggle-knob {
+            transform: translateX(20px);
+        }
+
+        .settings-section {
+            margin-bottom: 24px;
+        }
+
+        .settings-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--text-primary);
+        }
+
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .setting-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .theme-toggle {
+            position: relative;
+            width: 60px;
+            height: 32px;
+            background: var(--bg-tertiary);
+            border-radius: 16px;
+            cursor: pointer;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+
+        .theme-toggle-slider {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 24px;
+            height: 24px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        [data-theme="light"] .theme-toggle-slider {
+            transform: translateX(28px);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+
+        .stat-detail-card {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .stat-detail-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .stat-detail-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .stat-detail-title {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .stat-detail-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .stat-detail-list {
+            margin-top: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .stat-detail-item {
+            padding: 8px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 13px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .stat-detail-item:last-child {
+            border-bottom: none;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .data-table th {
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+        }
+
+        .data-table tr:hover td {
+            background: var(--bg-tertiary);
+        }
+
+        .file-tree {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            line-height: 1.8;
+        }
+
+        .file-tree-item {
+            padding: 4px 0;
+            padding-left: 20px;
+            position: relative;
+            color: var(--text-secondary);
+        }
+
+        .file-tree-item:before {
+            content: "📄";
+            position: absolute;
+            left: 0;
+            opacity: 0.6;
+        }
+
+        .file-tree-item.dir:before {
+            content: "📁";
+        }
+
+        .file-tree-item.dir {
+            color: var(--feast-orange);
+            font-weight: 500;
+        }
+
+        .notification {
+            position: fixed;
+            top: 80px;
+            right: 24px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px 20px;
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 10000;
+            transform: translateX(400px);
+            transition: transform 0.3s;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification-icon {
+            font-size: 20px;
+        }
+
+        .notification-content {
+            flex: 1;
+        }
+
+        .notification-title {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .notification-text {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        @media (max-width: 1200px) {
+            .side-panel {
+                width: 100%;
+            }
+            
+            .code-editor-panel {
+                width: 100%;
+            }
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        [data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+            background: #cbd5e1;
+        }
+
+        .lasso {
+            position: absolute;
+            border: 2px dashed var(--feast-orange);
+            background: rgba(249, 115, 22, 0.1);
+            pointer-events: none;
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .status-healthy {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--feast-green);
+        }
+
+        .status-warning {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--feast-yellow);
+        }
+
+        .status-error {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--feast-red);
+        }
+
+        .quality-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .quality-high {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--feast-green);
+        }
+
+        .quality-medium {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--feast-yellow);
+        }
+
+        .quality-low {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--feast-red);
+        }
+
+        /* Edge Manager Panel Styles */
+        .edge-manager-panel {
+            position: fixed;
+            top: 64px;
+            right: 0;
+            bottom: 0;
+            width: 480px;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            z-index: 450;
+            transform: translateX(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .edge-manager-panel.open {
+            transform: translateX(0);
+        }
+
+        .edge-manager-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .edge-manager-title {
+            font-size: 18px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .edge-manager-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+        }
+
+        .edge-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .edge-item {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            transition: all 0.2s;
+        }
+
+        .edge-item:hover {
+            border-color: var(--feast-orange);
+            transform: translateX(4px);
+        }
+
+        .edge-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .edge-node-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .edge-arrow {
+            color: var(--text-muted);
+            font-size: 20px;
+        }
+
+        .edge-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .edge-btn {
+            padding: 6px 12px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .edge-btn:hover {
+            border-color: var(--feast-orange);
+            color: var(--feast-orange);
+        }
+
+        .edge-btn.danger:hover {
+            border-color: var(--feast-red);
+            color: var(--feast-red);
+        }
+
+        .add-edge-section {
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 2px solid var(--border-color);
+        }
+
+        .add-edge-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+        }
+
+        .edge-select-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .edge-select {
+            flex: 1;
+            padding: 10px 14px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+
+        .edge-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .edge-stat-card {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .edge-stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--feast-orange);
+        }
+
+        .edge-stat-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+
+        /* File Browser in Code Editor */
+        .file-browser {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 20px;
+        }
+
+        .file-browser-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+        }
+
+        .file-browser-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .file-browser-item.active {
+            background: rgba(249, 115, 22, 0.1);
+            border: 1px solid var(--feast-orange);
+        }
+
+        .file-icon {
+            font-size: 16px;
+        }
+
+        .file-name {
+            color: var(--text-primary);
+        }
+
+        .file-description {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-left: auto;
+        }
+
+        .code-editor-layout {
+            display: flex;
+            gap: 20px;
+            height: 100%;
+        }
+
+        .file-sidebar {
+            width: 220px;
+            flex-shrink: 0;
+            border-right: 1px solid var(--border-color);
+            padding-right: 20px;
+        }
+
+        .file-content-area {
+            flex: 1;
+            overflow: auto;
+        }
+
+        .file-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .file-header-icon {
+            font-size: 20px;
+        }
+
+        .file-header-name {
+            font-size: 16px;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .file-header-path {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-left: auto;
+        }
+
+        /* Data Flow Visualization Modal */
+        .data-flow-stage {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .data-flow-stage:hover {
+            border-color: var(--feast-orange);
+            transform: translateX(8px);
+        }
+
+        .data-flow-stage.active {
+            border-color: var(--feast-green);
+            background: rgba(16, 185, 129, 0.05);
+        }
+
+        .stage-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .stage-info {
+            flex: 1;
+        }
+
+        .stage-title {
+            font-weight: 600;
+            font-size: 15px;
+            margin-bottom: 4px;
+        }
+
+        .stage-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+        }
+
+        .stage-status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-green { background: var(--feast-green); }
+        .status-yellow { background: var(--feast-yellow); }
+        .status-red { background: var(--feast-red); }
+
+        .stage-details {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border-color);
+            font-size: 12px;
+            color: var(--text-secondary);
+            display: none;
+        }
+
+        .data-flow-stage.expanded .stage-details {
+            display: block;
+        }
+
+        .flow-connector {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 32px;
+            color: var(--text-muted);
+            font-size: 20px;
+        }
+
+        /* LLM Helper Panel */
+        .llm-panel {
+            position: fixed;
+            top: 64px;
+            right: 0;
+            bottom: 0;
+            width: 480px;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            z-index: 460;
+            transform: translateX(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .llm-panel.open {
+            transform: translateX(0);
+        }
+
+        .llm-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .llm-title {
+            font-size: 18px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .llm-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .llm-context {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .llm-context-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .llm-context-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 0;
+            font-size: 13px;
+            color: var(--text-primary);
+        }
+
+        .llm-prompts {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .llm-prompt-btn {
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        .llm-prompt-btn:hover {
+            border-color: var(--feast-purple);
+            background: rgba(139, 92, 246, 0.1);
+        }
+
+        .llm-chat {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .llm-messages {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .llm-message {
+            padding: 12px 16px;
+            border-radius: 12px;
+            max-width: 90%;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .llm-message.user {
+            background: var(--feast-purple);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+
+        .llm-message.assistant {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+
+        .llm-message.assistant pre {
+            background: var(--code-bg);
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 8px 0;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+        }
+
+        .llm-input-area {
+            display: flex;
+            gap: 8px;
+        }
+
+        .llm-input {
+            flex: 1;
+            padding: 12px 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 14px;
+            resize: none;
+            min-height: 44px;
+            max-height: 120px;
+        }
+
+        .llm-input:focus {
+            outline: none;
+            border-color: var(--feast-purple);
+        }
+
+        .llm-send-btn {
+            padding: 12px 20px;
+            background: var(--feast-purple);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .llm-send-btn:hover {
+            background: #7c3aed;
+            transform: scale(1.05);
+        }
+
+        .llm-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .llm-action-btn {
+            padding: 6px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .llm-action-btn:hover {
+            border-color: var(--feast-purple);
+            color: var(--feast-purple);
+        }
+
+        /* Django Admin Panel */
+        .django-panel {
+            position: fixed;
+            top: 64px;
+            right: 0;
+            bottom: 0;
+            width: 480px;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            z-index: 470;
+            transform: translateX(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .django-panel.open {
+            transform: translateX(0);
+        }
+
+        .django-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .django-title {
+            font-size: 18px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .django-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+        }
+
+        .django-section {
+            margin-bottom: 24px;
+        }
+
+        .django-section-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+
+        .permission-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .perm-owned {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--feast-green);
+        }
+
+        .perm-granted {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--feast-blue);
+        }
+
+        .perm-pending {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--feast-yellow);
+        }
+
+        .perm-denied {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--feast-red);
+        }
+
+        .audit-log-item {
+            display: flex;
+            gap: 12px;
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .audit-time {
+            color: var(--text-muted);
+            font-size: 11px;
+            min-width: 60px;
+        }
+
+        .audit-action {
+            color: var(--text-primary);
+        }
+
+        .audit-user {
+            color: var(--feast-blue);
+        }
+
+        .column-security-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 8px;
+        }
+
+        .column-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        .column-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-accessible { background: var(--feast-green); }
+        .status-masked { background: var(--feast-yellow); }
+        .status-denied { background: var(--feast-red); }
+
+        /* Interactive Tour */
+        .tour-highlight {
+            position: fixed;
+            border: 3px solid var(--feast-orange);
+            border-radius: 12px;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7);
+            z-index: 10001;
+            pointer-events: none;
+            animation: pulse-border 2s infinite;
+        }
+
+        @keyframes pulse-border {
+            0%, 100% { box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7), 0 0 20px var(--feast-orange); }
+            50% { box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7), 0 0 40px var(--feast-orange); }
+        }
+
+        .tour-tooltip {
+            position: fixed;
+            background: var(--bg-secondary);
+            border: 2px solid var(--feast-orange);
+            border-radius: 12px;
+            padding: 20px;
+            max-width: 320px;
+            z-index: 10002;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .tour-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--feast-orange);
+        }
+
+        .tour-text {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+
+        .tour-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .tour-step {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        /* Pattern Library */
+        .pattern-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .pattern-card {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .pattern-card:hover {
+            border-color: var(--feast-orange);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        }
+
+        .pattern-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin-bottom: 12px;
+        }
+
+        .pattern-name {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .pattern-desc {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .pattern-tags {
+            display: flex;
+            gap: 6px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+
+        .pattern-tag {
+            padding: 2px 8px;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* User Selector */
+        .user-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .user-selector:hover {
+            border-color: var(--feast-orange);
+        }
+
+        .user-avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--feast-orange), var(--feast-purple));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: white;
+            font-weight: 600;
+        }
+
+        .user-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .user-name {
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .user-role {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* Loading States */
+        .loading-skeleton {
+            background: linear-gradient(90deg, var(--bg-tertiary) 25%, var(--bg-secondary) 50%, var(--bg-tertiary) 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+            border-radius: 4px;
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--feast-orange);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Access Request Button */
+        .access-request-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            background: linear-gradient(135deg, var(--feast-green), #059669);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 12px;
+        }
+
+        .access-request-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .access-request-btn:disabled {
+            background: var(--bg-tertiary);
+            color: var(--text-muted);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Guide Context Tabs */
+        .guide-context-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 12px;
+            overflow-x: auto;
+        }
+
+        .context-tab {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border: none;
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+
+        .context-tab:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .context-tab.active {
+            background: var(--feast-blue);
+            color: white;
+        }
+
+        /* Guide Hero Section */
+        .guide-hero {
+            background: linear-gradient(135deg, #49699c 0%, #846656 100%);
+            border-radius: 16px;
+            padding: 40px;
+            color: white;
+            margin-bottom: 32px;
+            text-align: center;
+        }
+
+        .guide-hero-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+
+        .guide-hero h2 {
+            font-size: 32px;
+            margin-bottom: 12px;
+            font-weight: 700;
+        }
+
+        .guide-hero p {
+            font-size: 16px;
+            opacity: 0.95;
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        /* Guide Grid */
+        .guide-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+
+        .guide-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .guide-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+        }
+
+        .guide-card-icon {
+            font-size: 40px;
+            margin-bottom: 16px;
+        }
+
+        .guide-card h3 {
+            font-size: 18px;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .guide-card p {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        /* Mermaid Containers */
+        .mermaid-container {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            overflow-x: auto;
+        }
+
+        .mermaid {
+            display: flex;
+            justify-content: center;
+        }
+
+        /* Component Showcase */
+        .component-showcase {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .component-item {
+            display: flex;
+            gap: 16px;
+            padding: 20px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .component-badge {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .component-info h4 {
+            font-size: 16px;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .component-info p {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+
+        .component-info code {
+            background: var(--bg-primary);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: var(--feast-green);
+        }
+
+        /* Workflow Steps */
+        .workflow-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .step {
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+        }
+
+        .step-number {
+            width: 40px;
+            height: 40px;
+            background: var(--feast-blue);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .step-content h4 {
+            font-size: 16px;
+            margin-bottom: 4px;
+            color: var(--text-primary);
+        }
+
+        .step-content p {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        /* Pattern Tabs */
+        .pattern-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .pattern-tab {
+            padding: 8px 16px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .pattern-tab.active {
+            background: var(--feast-blue);
+            color: white;
+            border-color: var(--feast-blue);
+        }
+
+        .pattern-details {
+            margin-top: 20px;
+        }
+
+        .pattern-details h4 {
+            font-size: 18px;
+            margin-bottom: 12px;
+            color: var(--text-primary);
+        }
+
+        .pattern-details ul {
+            margin-left: 20px;
+            margin-bottom: 20px;
+        }
+
+        .pattern-details li {
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        /* Database Matrix */
+        .db-matrix {
+            overflow-x: auto;
+        }
+
+        /* Code Comparison */
+        .code-comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .code-panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .code-header {
+            background: var(--bg-tertiary);
+            padding: 12px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .code-panel pre {
+            padding: 16px;
+            margin: 0;
+            font-size: 13px;
+            line-height: 1.5;
+            overflow-x: auto;
+        }
+
+        /* Strategy Cards */
+        .strategy-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .strategy-card {
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .strategy-header {
+            padding: 16px;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+        }
+
+        .latency-badge {
+            background: rgba(255,255,255,0.2);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .strategy-body {
+            padding: 16px;
+            background: var(--bg-secondary);
+        }
+
+        .strategy-body p {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+
+        .strategy-body code {
+            background: var(--bg-primary);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: var(--feast-orange);
+        }
+
+        /* Feature Discovery */
+        .feature-discovery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+        }
+
+        .discovery-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .discovery-icon {
+            font-size: 32px;
+            margin-bottom: 12px;
+        }
+
+        .discovery-card h4 {
+            font-size: 16px;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .discovery-card p {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .discovery-card code, .discovery-card kbd {
+            background: var(--bg-primary);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        /* Access Flow */
+        .access-flow {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            justify-content: center;
+            padding: 24px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+        }
+
+        .access-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            text-align: center;
+            max-width: 120px;
+        }
+
+        .step-badge {
+            width: 32px;
+            height: 32px;
+            background: var(--feast-blue);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+        }
+
+        .access-arrow {
+            color: var(--text-muted);
+            font-size: 20px;
+        }
+
+        /* Endpoint List */
+        .endpoint-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .endpoint-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+        }
+
+        .endpoint-method {
+            background: var(--feast-green);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            font-family: monospace;
+            min-width: 80px;
+            text-align: center;
+        }
+
+        .endpoint-path {
+            font-family: monospace;
+            font-size: 14px;
+            color: var(--feast-blue);
+            flex: 1;
+        }
+
+        .endpoint-desc {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        /* Model Hierarchy */
+        .model-hierarchy {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .model-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .model-card.primary {
+            border-color: var(--feast-blue);
+            border-width: 2px;
+        }
+
+        .model-card.secondary {
+            border-color: var(--feast-green);
+            border-style: dashed;
+        }
+
+        .model-children {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-left: 40px;
+        }
+
+        .model-card h4 {
+            font-size: 16px;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .model-card p {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .code-comparison {
+                grid-template-columns: 1fr;
+            }
+            
+            .guide-context-tabs {
+                flex-wrap: nowrap;
+                overflow-x: scroll;
+            }
+            
+            .model-children {
+                margin-left: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="toolbar">
+            <div class="toolbar-brand">
+                <div class="toolbar-logo"></div>
+                <div>
+                    <div class="toolbar-title">Feast Architect</div>
+                    <div class="toolbar-subtitle" id="repoSubtitle">Feature Store Visualization</div>
+                </div>
+            </div>
+
+<div class="toolbar-section hide-me">
+
+                <div class="search-box">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" class="search-input" placeholder="Search entities, features, tags, apps..." id="searchInput" autocomplete="off">
+                    <div class="search-dropdown" id="searchDropdown">
+                        <div class="search-dropdown-content" id="searchDropdownContent"></div>
+                    </div>
+                </div>
+
+                <div class="toolbar-divider"></div>
+
+                <button class="btn btn-icon" onclick="diagram.toggleTheme()" title="Toggle Theme">
+                    <span id="themeIcon">☀️</span>
+                </button>
+
+                <button class="btn btn-icon" onclick="diagram.showSettings()" title="Settings">
+                    <span>⚙️</span>
+                </button>
+
+                <button class="btn btn-icon" onclick="diagram.toggleEdgeManager()" title="Edge Manager">
+                    <span>🔗</span>
+                </button>
+
+                <button class="btn btn-ai btn-icon" onclick="diagram.toggleLLMHelper()" title="AI Assistant (Ctrl+Shift+A)">
+                    <span>🤖</span>
+                </button>
+
+                <button class="btn btn-icon" onclick="diagram.toggleDjangoAdmin()" title="Django Admin (Ctrl+Shift+D)">
+                    <span>🎭</span>
+                </button>
+
+                <div class="toolbar-divider"></div>
+
+                <div class="view-controls">
+                    <button class="layer-toggle" id="toggleSources" onclick="diagram.toggleLayer('datasource')">
+                        <span class="eye-icon">👁</span>
+                        <span>Sources</span>
+                    </button>
+                    <button class="layer-toggle" id="toggleEntities" onclick="diagram.toggleLayer('entity')">
+                        <span class="eye-icon">👁</span>
+                        <span>Entities</span>
+                    </button>
+                    <button class="layer-toggle" id="toggleViews" onclick="diagram.toggleLayer('featureview')">
+                        <span class="eye-icon">👁</span>
+                        <span>Views</span>
+                    </button>
+                    <button class="layer-toggle" id="toggleServices" onclick="diagram.toggleLayer('service')">
+                        <span class="eye-icon">👁</span>
+                        <span>Services</span>
+                    </button>
+                </div>
+
+                <div class="toolbar-divider"></div>
+
+                <button class="btn btn-sm" onclick="diagram.showGuide()">
+                    <span>📖</span>
+                    <span>Guide</span>
+                </button>
+                <button class="btn btn-primary btn-sm" onclick="diagram.export()">
+                    <span>💾</span>
+                    <span>Export</span>
+                </button>
+                <button class="btn btn-sm" onclick="diagram.import()">
+                    <span>📥</span>
+                    <span>Import</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="quick-actions">
+            <button class="btn btn-icon" onclick="diagram.fit()" title="Fit to screen">⛶</button>
+            <button class="btn btn-icon" onclick="diagram.resetView()" title="Reset view">⌖</button>
+            <button class="btn btn-icon" onclick="diagram.toggleMiniMap()" title="Toggle minimap">🗺</button>
+            <button class="btn btn-icon" onclick="diagram.toggleCodeEditor()" title="Toggle Code Editor" id="codeEditorToggleBtn">📝</button>
+            <button class="btn btn-icon" onclick="diagram.showDataFlow()" title="Data Flow Architecture">🌊</button>
+	    <button class="btn btn-icon btn-push" onclick="diagram.pushRepo()" title="Push Repository">📤</button>
+	    <button class="btn btn-icon" onclick="diagram.refreshRepo()" title="Refresh Repository">🔄</button>
+        </div>
+
+        <div class="fab-menu">
+            <button class="fab fab-primary" onclick="diagram.showAddMenu()">
+                <span>+</span>
+                <span class="fab-label">Add Component</span>
+            </button>
+            <button class="fab" onclick="diagram.showAddModal('datasource')" style="display:none;" id="fabSource">
+                <span>🗄️</span>
+                <span class="fab-label">Data Source</span>
+            </button>
+            <button class="fab" onclick="diagram.showAddModal('entity')" style="display:none;" id="fabEntity">
+                <span>👤</span>
+                <span class="fab-label">Entity</span>
+            </button>
+            <button class="fab" onclick="diagram.showAddModal('featureview')" style="display:none;" id="fabView">
+                <span>📊</span>
+                <span class="fab-label">Feature View</span>
+            </button>
+            <button class="fab" onclick="diagram.showAddModal('service')" style="display:none;" id="fabService">
+                <span>🚀</span>
+                <span class="fab-label">Service</span>
+            </button>
+        </div>
+
+        <div class="canvas-wrapper">
+            <div class="grid-background"></div>
+            <canvas id="diagramCanvas"></canvas>
+            
+            <div class="stats-bar" id="statsBar" onclick="diagram.showStatsModal()">
+                <div class="stat-item">
+                    <div class="stat-icon" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa;">🗄️</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="statSources">0</div>
+                        <div class="stat-label">Sources</div>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-icon" style="background: rgba(139, 92, 246, 0.2); color: #a78bfa;">👤</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="statEntities">0</div>
+                        <div class="stat-label">Entities</div>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-icon" style="background: rgba(16, 185, 129, 0.2); color: #34d399;">📊</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="statViews">0</div>
+                        <div class="stat-label">Views</div>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-icon" style="background: rgba(249, 115, 22, 0.2); color: #fb923c;">🚀</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="statServices">0</div>
+                        <div class="stat-label">Services</div>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-icon" style="background: rgba(6, 182, 212, 0.2); color: #22d3ee;">⚡</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="statFeatures">0</div>
+                        <div class="stat-label">Features</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mini-map" id="miniMap">
+                <canvas id="miniMapCanvas"></canvas>
+            </div>
+
+            <div class="canvas-controls">
+                <button class="canvas-btn" onclick="diagram.zoomIn()">+</button>
+                <button class="canvas-btn" onclick="diagram.zoomOut()">−</button>
+                <button class="canvas-btn" onclick="diagram.fit()">⊘</button>
+            </div>
+        </div>
+
+        <!-- Edge Manager Panel -->
+        <div class="edge-manager-panel" id="edgeManagerPanel">
+            <div class="edge-manager-header">
+                <div class="edge-manager-title">
+                    <span>🔗</span>
+                    <span>Edge Manager</span>
+                </div>
+                <button class="btn btn-icon" onclick="diagram.toggleEdgeManager()">✕</button>
+            </div>
+            <div class="edge-manager-content" id="edgeManagerContent">
+                <div class="edge-stats">
+                    <div class="edge-stat-card">
+                        <div class="edge-stat-value" id="edgeCountTotal">0</div>
+                        <div class="edge-stat-label">Total Connections</div>
+                    </div>
+                    <div class="edge-stat-card">
+                        <div class="edge-stat-value" id="edgeCountValid">0</div>
+                        <div class="edge-stat-label">Valid</div>
+                    </div>
+                    <div class="edge-stat-card">
+                        <div class="edge-stat-value" id="edgeCountOrphaned">0</div>
+                        <div class="edge-stat-label">Orphaned</div>
+                    </div>
+                </div>
+                
+                <div class="edge-list" id="edgeList">
+                    <!-- Edge items will be populated here -->
+                </div>
+
+                <div class="add-edge-section">
+                    <div class="add-edge-title">➕ Add New Connection</div>
+                    <div class="form-group">
+                        <label class="form-label">From Node</label>
+                        <select class="form-select" id="edgeFromSelect">
+                            <option value="">Select source...</option>
+                        </select>
+                    </div>
+                    <div class="edge-select-row">
+                        <span style="font-size: 20px; color: var(--text-muted);">↓</span>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">To Node</label>
+                        <select class="form-select" id="edgeToSelect">
+                            <option value="">Select target...</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" style="width: 100%; margin-top: 12px;" onclick="diagram.addEdgeFromManager()">
+                        Create Connection
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- LLM Helper Panel -->
+        <div class="llm-panel" id="llmPanel">
+            <div class="llm-header">
+                <div class="llm-title">
+                    <span>🤖</span>
+                    <span>AI Assistant</span>
+                </div>
+                <button class="btn btn-icon" onclick="diagram.toggleLLMHelper()">✕</button>
+            </div>
+            <div class="llm-content">
+                <div class="llm-context">
+                    <div class="llm-context-title">Current Context</div>
+                    <div id="llmContextContent">
+                        <div class="llm-context-item">
+                            <span>📊</span>
+                            <span>No node selected</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="llm-prompts">
+                    <button class="llm-prompt-btn" onclick="diagram.askLLM('generate_code')">
+                        <strong>Generate Feast Code</strong><br>
+                        <small>Create Python code for current architecture</small>
+                    </button>
+                    <button class="llm-prompt-btn" onclick="diagram.askLLM('optimize')">
+                        <strong>Suggest Optimizations</strong><br>
+                        <small>Improve feature view performance</small>
+                    </button>
+                    <button class="llm-prompt-btn" onclick="diagram.askLLM('lineage')">
+                        <strong>Explain Data Lineage</strong><br>
+                        <small>Trace data flow from source to service</small>
+                    </button>
+                    <button class="llm-prompt-btn" onclick="diagram.askLLM('validate')">
+                        <strong>Validate Relationships</strong><br>
+                        <small>Check entity and feature consistency</small>
+                    </button>
+                </div>
+
+                <div class="llm-chat">
+                    <div class="llm-messages" id="llmMessages">
+                        <!-- Messages will appear here -->
+                    </div>
+                    <div class="llm-input-area">
+                        <textarea class="llm-input" id="llmInput" placeholder="Ask anything about your feature store..." rows="1"></textarea>
+                        <button class="llm-send-btn" onclick="diagram.sendLLMMessage()">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Django Admin Panel -->
+        <div class="django-panel" id="djangoPanel">
+            <div class="django-header">
+                <div class="django-title">
+                    <span>🎭</span>
+                    <span>Django Admin</span>
+                </div>
+                <button class="btn btn-icon" onclick="diagram.toggleDjangoAdmin()">✕</button>
+            </div>
+            <div class="django-content">
+                <div class="django-section">
+                    <div class="django-section-title">Access Control</div>
+                    <div class="detail-card">
+                        <div class="detail-row">
+                            <span class="detail-label">Current User</span>
+                            <span class="detail-value" id="djangoCurrentUser">John Doe</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Team</span>
+                            <span class="detail-value" id="djangoTeam">Data Engineering</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Role</span>
+                            <span class="detail-value" id="djangoRole">Feature Developer</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="django-section">
+                    <div class="django-section-title">Resource Permissions</div>
+                    <div id="djangoPermissions">
+                        <!-- Permissions will be populated here -->
+                    </div>
+                </div>
+
+                <div class="django-section">
+                    <div class="django-section-title">Recent Audit Log</div>
+                    <div id="djangoAuditLog">
+                        <!-- Audit log will be populated here -->
+                    </div>
+                </div>
+
+                <div class="django-section">
+                    <div class="django-section-title">Column Security</div>
+                    <div id="djangoColumnSecurity">
+                        <!-- Column security will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Code Editor Panel with File Browser -->
+        <div class="code-editor-panel" id="codeEditorPanel">
+            <div class="code-editor-header">
+                <div class="code-editor-title">
+                    <span>📝</span>
+                    <span>Feature Repository</span>
+                </div>
+                <div class="code-editor-controls">
+                    <select class="code-editor-select" id="codeFormatSelect" onchange="diagram.updateCodeEditor()">
+                        <option value="python">Python Files</option>
+                        <option value="json">JSON (export)</option>
+                        <option value="yaml">YAML (feature_store.yaml)</option>
+                    </select>
+                    <button class="btn btn-sm" onclick="diagram.copyCodeEditor()">📋 Copy</button>
+                    <button class="btn btn-icon" onclick="diagram.toggleCodeEditor()">✕</button>
+                </div>
+            </div>
+            <div class="code-editor-content">
+                <div class="code-editor-layout">
+                    <div class="file-sidebar" id="fileSidebar">
+                        <!-- File browser populated by JS -->
+                    </div>
+                    <div class="file-content-area">
+                        <div class="file-header" id="fileHeader">
+                            <span class="file-header-icon">📄</span>
+                            <span class="file-header-name" id="currentFileName">Select a file</span>
+                            <span class="file-header-path" id="currentFilePath"></span>
+                        </div>
+                        <div class="code-block" style="height: calc(100% - 60px);">
+                            <pre class="code-content" id="codeEditorContent" style="white-space: pre-wrap; word-wrap: break-word;"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="side-panel" id="detailPanel">
+            <div class="panel-resize"></div>
+            <div class="panel-header">
+                <div class="panel-title-section">
+                    <div class="panel-type-badge" id="panelBadge">
+                        <span id="panelIcon">📊</span>
+                        <span id="panelType">Feature View</span>
+                    </div>
+                    <div class="panel-title" id="panelTitle">Select a Component</div>
+                    <div class="panel-subtitle" id="panelSubtitle">Click on any node to view details</div>
+                    <div class="tags-container" id="panelTags"></div>
+                </div>
+                <div class="panel-actions">
+                    <button class="panel-action-btn" onclick="diagram.editSelected()" title="Edit">✏️</button>
+                    <button class="panel-action-btn delete" onclick="diagram.deleteSelected()" title="Delete">🗑️</button>
+                    <button class="panel-action-btn" onclick="diagram.closePanel()" title="Close">✕</button>
+                </div>
+            </div>
+            <div class="panel-content" id="panelContent">
+                <div class="empty-state">
+                    <div class="empty-icon">📋</div>
+                    <div class="empty-title">No Selection</div>
+                    <p>Click on any component in the diagram to view its details, connections, and metadata.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tooltip" id="tooltip">
+        <div class="tooltip-header">
+            <div class="tooltip-icon" id="tooltipIcon">📊</div>
+            <div class="tooltip-title-section">
+                <div class="tooltip-title" id="tooltipTitle">Component Name</div>
+                <div class="tooltip-subtitle" id="tooltipSubtitle">Type • Subtype</div>
+            </div>
+        </div>
+        <div class="tooltip-section" id="tooltipTags">
+            <div class="tooltip-section-title">Tags</div>
+            <div class="tooltip-tags" id="tooltipTagList"></div>
+        </div>
+        <div class="tooltip-section" id="tooltipFeatures">
+            <div class="tooltip-section-title">Features</div>
+            <div class="tooltip-features" id="tooltipFeatureList"></div>
+        </div>
+        <div class="tooltip-section" id="tooltipDescription">
+            <div class="tooltip-section-title">Description</div>
+            <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;" id="tooltipDescText"></div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="componentModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title" id="modalTitle">Add Component</div>
+                <button class="modal-close" onclick="diagram.closeModal()">×</button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+            <div class="modal-footer">
+                <button class="btn" onclick="diagram.closeModal()">Cancel</button>
+                <button class="btn btn-danger" onclick="diagram.confirmDelete()" id="deleteBtn" style="display:none; margin-right: auto;">Delete</button>
+                <button class="btn btn-primary" onclick="diagram.saveComponent()">Save Component</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title">⚙️ Settings</div>
+                <button class="modal-close" onclick="document.getElementById('settingsModal').classList.remove('active')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-section">
+                    <div class="settings-title">Appearance</div>
+                    <div class="setting-item">
+                        <span class="setting-label">Dark Mode</span>
+                        <div class="theme-toggle" onclick="diagram.toggleTheme()">
+                            <div class="theme-toggle-slider">
+                                <span id="settingsThemeIcon">🌙</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <div class="settings-title">Repository Info</div>
+                    <div class="form-group">
+                        <label class="form-label">Repository Name</label>
+                        <input type="text" class="form-input" id="settingsRepoName" placeholder="my_feature_repo">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Repository Location</label>
+                        <input type="text" class="form-input" id="settingsRepoLocation" placeholder="/path/to/feature_repo">
+                    </div>
+                    <!-- New description field -->
+                    <div class="form-group">
+                        <label class="form-label">Repository Description</label>
+                        <textarea class="form-textarea" id="settingsRepoDescription" placeholder="Brief description of this feature repository" rows="2"></textarea>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <div class="settings-title">Search Configuration</div>
+                    <div class="setting-item">
+                        <span class="setting-label">Include Descriptions</span>
+                        <div class="toggle-switch" onclick="diagram.toggleSearchSetting('descriptions')">
+                            <div class="toggle-slider active" id="toggleDescriptions">
+                                <div class="toggle-knob"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <span class="setting-label">Include Tags</span>
+                        <div class="toggle-switch" onclick="diagram.toggleSearchSetting('tags')">
+                            <div class="toggle-slider active" id="toggleTags">
+                                <div class="toggle-knob"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <span class="setting-label">Include Used By (Applications)</span>
+                        <div class="toggle-switch" onclick="diagram.toggleSearchSetting('usedBy')">
+                            <div class="toggle-slider active" id="toggleUsedBy">
+                                <div class="toggle-knob"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <span class="setting-label">Include Access Process</span>
+                        <div class="toggle-switch" onclick="diagram.toggleSearchSetting('access')">
+                            <div class="toggle-slider active" id="toggleAccess">
+                                <div class="toggle-knob"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <div class="settings-title">Data Sources</div>
+                    <div class="setting-item">
+                        <span class="setting-label">Default Owner Team</span>
+                        <input type="text" class="form-input" id="settingsDefaultOwner" placeholder="Data Platform Team" style="width: 200px;">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="document.getElementById('settingsModal').classList.remove('active')">Cancel</button>
+                <button class="btn btn-primary" onclick="diagram.saveSettings()">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="statsModal">
+        <div class="modal modal-xl">
+            <div class="modal-header">
+                <div class="modal-title">📊 System Overview</div>
+                <button class="modal-close" onclick="document.getElementById('statsModal').classList.remove('active')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="stats-grid" id="statsGrid"></div>
+                
+                <div style="margin-top: 24px;">
+                    <div class="section-header">
+                        <div class="section-title">Repository Structure</div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="file-tree" id="fileTree"></div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 24px;">
+                    <div class="section-header">
+                        <div class="section-title">Recent Activity</div>
+                    </div>
+                    <div class="detail-card">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Action</th>
+                                    <th>Component</th>
+                                    <th>User</th>
+                                </tr>
+                            </thead>
+                            <tbody id="activityTable">
+                                <tr>
+                                    <td>Just now</td>
+                                    <td>Viewed</td>
+                                    <td>System Overview</td>
+                                    <td>Current User</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="usageModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title" id="usageModalTitle">Application Details</div>
+                <button class="modal-close" onclick="document.getElementById('usageModal').classList.remove('active')">×</button>
+            </div>
+            <div class="modal-body" id="usageModalBody"></div>
+            <div class="modal-footer">
+                <button class="btn" onclick="document.getElementById('usageModal').classList.remove('active')">Close</button>
+                <button class="btn btn-primary" onclick="diagram.saveUsageDetails()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="guideModal">
+        <div class="modal modal-xxl">
+            <div class="modal-header">
+                <div class="modal-title">📖 Feature Architect Store Guide</div>
+                <button class="modal-close" onclick="document.getElementById('guideModal').classList.remove('active')">×</button>
+            </div>
+            <div class="modal-body">
+                <!-- User Context Selector -->
+                <div class="guide-context-tabs">
+                    <button class="context-tab active" onclick="diagram.switchGuideContext('overview')" id="tab-overview">
+                        <span>🏠</span> Overview
+                    </button>
+                    <button class="context-tab" onclick="diagram.switchGuideContext('data-engineer')" id="tab-data-engineer">
+                        <span>⚙️</span> Data Engineer
+                    </button>
+                    <button class="context-tab" onclick="diagram.switchGuideContext('ml-engineer')" id="tab-ml-engineer">
+                        <span>🤖</span> ML Engineer
+                    </button>
+                    <button class="context-tab" onclick="diagram.switchGuideContext('data-scientist')" id="tab-data-scientist">
+                        <span>📊</span> Data Scientist
+                    </button>
+                    <button class="context-tab" onclick="diagram.switchGuideContext('backend')" id="tab-backend">
+                        <span>🔧</span> Backend API
+                    </button>
+                </div>
+
+                <!-- OVERVIEW CONTEXT -->
+                <div class="guide-content active" id="guide-overview">
+                    <div class="guide-hero">
+                        <div class="guide-hero-icon">🏗️</div>
+                        <h2>Feature Architect Store</h2>
+                        <p>Visual design tool for Feast feature stores with collaborative architecture planning, 
+                        code generation, and LLM-powered assistance. Bridge the gap between data infrastructure 
+                        and machine learning with intuitive drag-and-drop design.</p>
+                    </div>
+
+                    <div class="guide-grid">
+                        <div class="guide-card">
+                            <div class="guide-card-icon">🎯</div>
+                            <h3>Visual Design</h3>
+                            <p>Drag-and-drop interface for designing feature store architectures. 
+                            Connect data sources to entities, feature views, and services with automatic validation.</p>
+                        </div>
+                        <div class="guide-card">
+                            <div class="guide-card-icon">💻</div>
+                            <h3>Code Generation</h3>
+                            <p>Auto-generate production-ready Python code for Feast entities, feature views, 
+                            and services. Export complete repository structures with proper documentation.</p>
+                        </div>
+                        <div class="guide-card">
+                            <div class="guide-card-icon">🤖</div>
+                            <h3>AI Assistant</h3>
+                            <p>LLM-powered guidance for architecture decisions, optimization suggestions, 
+                            and data lineage analysis. Get real-time feedback on your design patterns.</p>
+                        </div>
+                        <div class="guide-card">
+                            <div class="guide-card-icon">🔐</div>
+                            <h3>Access Control</h3>
+                            <p>Built-in ownership tracking, access process documentation, and column-level 
+                            security. Integrate with Django permissions for enterprise governance.</p>
+                        </div>
+                    </div>
+
+                    <div class="guide-section">
+                        <div class="guide-title">Architecture Overview</div>
+                        <div class="mermaid-container">
+                            <pre class="mermaid">
+    flowchart TB
+        subgraph DataSources["Data Sources Layer"]
+            PG[(PostgreSQL)]
+            MG[(MongoDB)]
+            KF[/Kafka/]
+            S3[(S3 Data Lake)]
+            RD[(Redis)]
+        end
+        
+        subgraph Ingestion["Ingestion Layer"]
+            DBZ[Debezium CDC]
+            SP[Spark Streaming]
+            BATCH[Batch Jobs]
+        end
+        
+        subgraph FeastCore["Feast Core"]
+            REG[(Registry)]
+            OFF[(Offline Store<br/>Snowflake/Postgres)]
+            ON[(Online Store<br/>Redis/DynamoDB)]
+        end
+        
+        subgraph Serving["Serving Layer"]
+            API[Feature Server API]
+            SDK[Python/Go/Java SDK]
+        end
+        
+        subgraph Consumers["ML Consumers"]
+            TRAIN[Training Pipelines]
+            INF[Real-time Inference]
+            BATCH_PRED[Batch Prediction]
+        end
+        
+        PG --> DBZ --> KF --> SP --> OFF
+        PG --> BATCH --> OFF
+        MG --> BATCH --> OFF
+        S3 --> BATCH --> OFF
+        
+        OFF -->|Materialize| ON
+        ON --> API --> SDK
+        
+        SDK --> TRAIN
+        SDK --> INF
+        SDK --> BATCH_PRED
+        
+        REG -.->|Metadata| OFF
+        REG -.->|Metadata| ON
+                            </pre>
+                        </div>
+                    </div>
+
+                    <div class="guide-section">
+                        <div class="guide-title">The Four Core Components</div>
+                        <div class="component-showcase">
+                            <div class="component-item">
+                                <div class="component-badge" style="background: #3b82f6;">🗄️</div>
+                                <div class="component-info">
+                                    <h4>Data Sources</h4>
+                                    <p>30+ supported databases including PostgreSQL, MongoDB, Kafka, Snowflake, 
+                                    and S3. Each with Debezium CDC support indicators and Spark integration patterns.</p>
+                                    <code>FileSource, KafkaSource, PushSource</code>
+                                </div>
+                            </div>
+                            <div class="component-item">
+                                <div class="component-badge" style="background: #8b5cf6;">👤</div>
+                                <div class="component-info">
+                                    <h4>Entities</h4>
+                                    <p>Business objects with unique join keys. The backbone of feature relationships 
+                                    enabling point-in-time correct joins across different feature views.</p>
+                                    <code>Entity(name="user", join_keys=["user_id"])</code>
+                                </div>
+                            </div>
+                            <div class="component-item">
+                                <div class="component-badge" style="background: #10b981;">📊</div>
+                                <div class="component-info">
+                                    <h4>Feature Views</h4>
+                                    <p>Logical groupings of features with TTL, entities, and data sources. 
+                                    Support batch, streaming, and on-demand computation modes.</p>
+                                    <code>FeatureView, StreamFeatureView, OnDemandFeatureView</code>
+                                </div>
+                            </div>
+                            <div class="component-item">
+                                <div class="component-badge" style="background: #f97316;">🚀</div>
+                                <div class="component-info">
+                                    <h4>Feature Services</h4>
+                                    <p>Model-ready feature bundles with versioning and SLA tracking. 
+                                    Composite services can reference other services for layered abstractions.</p>
+                                    <code>FeatureService(name="recommendation_v1")</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="guide-section">
+                        <div class="guide-title">Quick Start Workflow</div>
+                        <div class="workflow-steps">
+                            <div class="step">
+                                <div class="step-number">1</div>
+                                <div class="step-content">
+                                    <h4>Design Architecture</h4>
+                                    <p>Use the canvas to drag data sources, define entities, and connect feature views. 
+                                    The Edge Manager helps validate all connections follow Feast patterns.</p>
+                                </div>
+                            </div>
+                            <div class="step">
+                                <div class="step-number">2</div>
+                                <div class="step-content">
+                                    <h4>Configure Ownership</h4>
+                                    <p>Set team ownership and access processes for each data source. 
+                                    Document security requirements and column-level PII classifications.</p>
+                                </div>
+                            </div>
+                            <div class="step">
+                                <div class="step-number">3</div>
+                                <div class="step-content">
+                                    <h4>Generate Code</h4>
+                                    <p>Export Python files (entities.py, feature_views.py, services.py) or 
+                                    complete JSON for version control. Includes Debezium configs and Spark jobs.</p>
+                                </div>
+                            </div>
+                            <div class="step">
+                                <div class="step-number">4</div>
+                                <div class="step-content">
+                                    <h4>Deploy & Monitor</h4>
+                                    <p>Push to Feast registry, materialize to online store, and monitor 
+                                    via the Data Flow view. Track lineage and performance in real-time.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DATA ENGINEER CONTEXT -->
+                <div class="guide-content" id="guide-data-engineer" style="display: none;">
+                    <div class="guide-hero" style="background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);">
+                        <div class="guide-hero-icon">⚙️</div>
+                        <h2>Data Engineer Guide</h2>
+                        <p>Build robust data pipelines, configure CDC with Debezium, and manage the 
+                        infrastructure layer of your feature store. Focus on data quality, latency, and scale.</p>
+                    </div>
+
+                    <div class="guide-section">
+                        <div class="guide-title">Data Source Configuration Patterns</div>
+                        
+                        <div class="pattern-tabs">
+                            <button class="pattern-tab active" onclick="diagram.showPattern('cdc-batch')">CDC Batch</button>
+                            <button class="pattern-tab" onclick="diagram.showPattern('streaming')">Streaming</button>
+                            <button class="pattern-tab" onclick="diagram.showPattern('hybrid')">Hybrid Lambda</button>
+                        </div>
+
+                        <div class="pattern-content active" id="pattern-cdc-batch">
+                            <div class="mermaid-container">
+                                <pre class="mermaid">
+    flowchart LR
+        A[(PostgreSQL)] -->|Debezium| B[Kafka Topic]
+        B -->|Spark Batch| C[(Offline Store<br/>Snowflake)]
+        C -->|Materialize| D[(Online Store<br/>Redis)]
+        D --> E[Feature Server]
+        
+        style A fill:#3b82f6,color:#fff
+        style D fill:#ef4444,color:#fff
+                                </pre>
+                            </div>
+                            <div class="pattern-details">
+                                <h4>Change Data Capture (CDC) Pattern</h4>
+                                <p>Best for: Transactional databases requiring near real-time features with historical accuracy.</p>
+                                <ul>
+                                    <li><strong>Debezium</strong> captures row-level changes from PostgreSQL/MySQL transaction logs</li>
+                                    <li><strong>Kafka</strong> provides durable event streaming with configurable retention</li>
+                                    <li><strong>Spark Structured Streaming</strong> processes events into the offline store</li>
+                                    <li><strong>Materialization</strong> syncs to online store for low-latency serving</li>
+                                </ul>
+                                <div class="code-block">
+                                    <pre># Generated Debezium Config
+    postgres_connector = {
+        "name": "user-db-connector",
+        "config": {
+            "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+            "database.hostname": "postgres.internal",
+            "database.server.name": "dbz",
+            "plugin.name": "pgoutput",
+            "table.include.list": "public.users,public.transactions"
+        }
+    }</pre>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pattern-content" id="pattern-streaming" style="display: none;">
+                            <div class="mermaid-container">
+                                <pre class="mermaid">
+    flowchart LR
+        A[/Kafka Events/] -->|Spark Streaming| B[Stream Feature View]
+        B -->|Write| C[(Online Store)]
+        B -->|Checkpoint| D[(Offline Store)]
+        
+        style A fill:#f59e0b,color:#000
+        style C fill:#ef4444,color:#fff
+                                </pre>
+                            </div>
+                            <div class="pattern-details">
+                                <h4>Streaming-First Pattern</h4>
+                                <p>Best for: High-velocity event streams requiring sub-second feature freshness.</p>
+                                <ul>
+                                    <li>Direct Kafka-to-Feature-View ingestion using Spark Structured Streaming</li>
+                                    <li>Windowed aggregations with watermarks for late data handling</li>
+                                    <li>Dual write to online (low latency) and offline (historical) stores</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="pattern-content" id="pattern-hybrid" style="display: none;">
+                            <div class="mermaid-container">
+                                <pre class="mermaid">
+    flowchart TB
+        A[(Source DB)] -->|Batch| B[Batch Feature View]
+        A -->|CDC| C[Stream Feature View]
+        B --> D[Unified Feature View]
+        C --> D
+        D --> E[Feature Service]
+        
+        style D fill:#8b5cf6,color:#fff
+                                </pre>
+                            </div>
+                            <div class="pattern-details">
+                                <h4>Lambda Architecture Pattern</h4>
+                                <p>Best for: Complex features requiring both historical completeness and real-time updates.</p>
+                                <ul>
+                                    <li><strong>Batch layer</strong>: Complete historical features with full accuracy</li>
+                                    <li><strong>Speed layer</strong>: Real-time increments for immediate availability</li>
+                                    <li><strong>Serving layer</strong>: Merged view combining both layers</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="guide-section">
+                        <div class="guide-title">Database Support Matrix</div>
+                        <div class="db-matrix">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Database</th>
+                                        <th>Category</th>
+                                        <th>Debezium CDC</th>
+                                        <th>Feast Source Type</th>
+                                        <th>Spark Pattern</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>🐘 PostgreSQL</td>
+                                        <td>Relational</td>
+                                        <td>✅ Yes</td>
+                                        <td>PostgreSQLSource</td>
+                                        <td>JDBC batch + CDC</td>
+                                    </tr>
+                                    <tr>
+                                        <td>🍃 MongoDB</td>
+                                        <td>NoSQL</td>
+                                        <td>✅ Yes</td>
+                                        <td>PushSource</td>
+                                        <td>MongoDB Spark Connector</td>
+                                    </tr>
+                                    <tr>
+                                        <td>❄️ Snowflake</td>
+                                        <td>Cloud Warehouse</td>
+                                        <td>❌ No</td>
+                                        <td>SnowflakeSource</td>
+                                        <td>Native connector</td>
+                                    </tr>
+                                    <tr>
+                                        <td>📨 Kafka</td>
+                                        <td>Streaming</td>
+                                        <td>N/A</td>
+                                        <td>KafkaSource</td>
+                                        <td>Structured Streaming</td>
+                                    </tr>
+                                    <tr>
+                                        <td>⚡ DynamoDB</td>
+                                        <td>NoSQL</td>
+                                        <td>❌ No</td>
+                                        <td>PushSource</td>
+                                        <td>DynamoDB Streams</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="guide-section">
+                        <div class="guide-title">Access Control Implementation</div>
+                        <div class="mermaid-container">
+                            <pre class="mermaid">
+    flowchart LR
+        subgraph Perimeter["Perimeter Security"]
+            AUTH[Django Auth]
+            RBAC[Role-Based Access]
+        end
+        
+        subgraph DataLayer["Data Layer"]
+            DS[Data Source Metadata]
+            COL[Column Security]
+            AUDIT[Audit Logging]
+        end
+        
+        subgraph Infrastructure["Infrastructure"]
+            KAFKA_ACL[Kafka ACLs]
+            SPARK_CTX[Spark Security Context]
+            RLS[Postgres RLS]
+        end
+        
+        AUTH --> RBAC --> DS
+        DS --> COL
+        COL --> KAFKA_ACL
+        COL --> SPARK_CTX
+        COL --> RLS
+        DS --> AUDIT
+        
+        style AUTH fill:#3b82f6,color:#fff
+        style RLS fill:#10b981,color:#fff
+                            </pre>
+                        </div>
+                        <p>Implement defense-in-depth with Django permissions flowing through to Kafka ACLs, 
+                        Spark security contexts, and Postgres Row-Level Security (RLS) policies.</p>
+                    </div>
+                </div>
+
+                <!-- ML ENGINEER CONTEXT -->
+                <div class="guide-content" id="guide-ml-engineer" style="display: none;">
+                    <div class="guide-hero" style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);">
+                        <div class="guide-hero-icon">🤖</div>
+                        <h2>ML Engineer Guide</h2>
+                        <p>Deploy models with reliable feature serving, manage feature transformations, 
+                        and optimize serving latency. Bridge training and inference with consistent feature logic.</p>
+                    </div>
+
+                    <div class="guide-section">
+                        <div class="guide-title">Feature Serving Architecture</div>
+                        <div class="mermaid-container">
+                            <pre class="mermaid">
+    flowchart TB
+        subgraph Training["Training Pipeline"]
+            HIST[Historical Features<br/>Point-in-Time Correct]
+            MODEL[Model Training]
+            REG[Model Registry]
+        end
+        
+        subgraph Serving["Real-time Serving"]
+            FEAT[Feature Retrieval]
+            TRANS[On-Demand Transform]
+            PRED[Prediction]
+        end
+        
+        subgraph Stores["Feature Stores"]
+            OFF[(Offline Store<br/>Batch/Historical)]
+            ON[(Online Store<br/>Low Latency)]
+        end
+        
+        OFF -->|get_historical_features| HIST
+        HIST --> MODEL --> REG --> PRED
+        ON -->|get_online_features| FEAT
+        FEAT --> TRANS --> PRED
+        
+        style ON fill:#ef4444,color:#fff
+        style OFF fill:#3b82f6,color:#fff
+                            </pre>
+                        </div>
+                    </div>
+
+                    <div class="guide-section">
+                        <div class="guide-title">Python SDK Usage Patterns</div>
+                        
+                        <div class="code-comparison">
+                            <div class="code-panel">
+                                <div class="code-header">Batch Retrieval (Training)</div>
+                                <pre class="code-content">from feast import FeatureStore
+    import pandas as pd
+
+    store = FeatureStore(repo_path=".")
+
+    # Point-in-time correct join
+    training_df = store.get_historical_features(
+        entity_df=pd.DataFrame({
+            "user_id": ["user_1", "user_2"],
+            "event_timestamp": [
+                datetime(2024, 1, 1),
+                datetime(2024, 1, 2)
+            ]
+        }),
+        features=[
+            "user_demographics:age",
+            "user_demographics:country",
+            "transaction_stats:amount_30d"
+        ]
+    ).to_df()</pre>
+                            </div>
+                            
+                            <div class="code-panel">
+                                <div class="code-header">Online Retrieval (Inference)</div>
+                                <pre class="code-content">from feast import FeatureStore
+
+    store = FeatureStore(repo_path=".")
+
+    # Low-latency feature lookup
+    features = store.get_online_features(
+        feature_service="recommendation_v1",
+        entity_rows=[
+            {"user_id": "user_123", "context": "mobile"}
+        ]
+    ).to_dict()
+
+    # On-demand transformation
+    prediction = model.predict(
+        features["user_demographics:age"],
+        features["transaction_stats:amount_30d"]
+    )</pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="guide-section">
+                        <div class="guide-title">Feature Transformation Strategies</div>
+                        <div class="strategy-cards">
+                            <div class="strategy-card">
+                                <div class="strategy-header" style="background: #10b981;">
+                                    <span>Pre-computed</span>
+                                    <span class="latency-badge">&lt; 10ms</span>
+                                </div>
+                                <div class="strategy-body">
+                                    <p>Transformations applied during ingestion or materialization. 
+                                    Best for: Aggregations, embeddings, complex SQL.</p>
+                                    <code>FeatureView with SQL transformation</code>
+                                </div>
+                            </div>
+                            <div class="strategy-card">
+                                <div class="strategy-header" style="background: #f59e0b;">
+                                    <span>On-Demand</span>
+                                    <span class="latency-badge">&lt; 50ms</span>
+                                </div>
+                                <div class="strategy-body">
+                                    <p>Computed at request time using request context. 
+                                    Best for: Time-since features, personalization logic.</p>
+                                    <code>OnDemandFeatureView with Python transform</code>
+                                </div>
+                            </div>
+                            <div class="strategy-card">
+                                <div class="strategy-header" style="background: #8b5cf6;">
+                                    <span>Hybrid</span>
+                                    <span class="latency-badge">Variable</span>
+                                </div>
+                                <div class="strategy-body">
+                                    <p>Combine pre-computed base features with on-demand overlays. 
+                                    Best for: Real-time personalization with historical context.</p>
+                                    <code>Feature Service composition</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="guide-section">
+                        <div class="guide-title">Performance Optimization</div>
+                        <ul class="optimization-list">
+                            <li>
+                                <strong>Online Store Selection</strong>
+                                <p>Redis for sub-5ms latency, DynamoDB for AWS-native, 
+                                Bigtable for Google Cloud. Consider data size vs. latency requirements.</p>
+                            </li>
+                            <li>
+                                <strong>Feature TTL Tuning</strong>
+                                <p>Set aggressive TTLs for volatile features (1 hour for session data), 
+                                longer for stable attributes (30 days for demographics).</p>
+                            </li>
+                            <li>
+                                <strong>Materialization Strategy</strong>
+                                <p>Incremental materialization for large datasets. 
+                                Schedule during off-peak hours for batch updates.</p>
+                            </li>
+                            <li>
+                                <strong>Embedding Caching</strong>
+                                <p>Cache computed embeddings in the online store 
+                                rather than computing on each request.</p>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- DATA SCIENTIST CONTEXT -->
+                <div class="guide-content" id="guide-data-scientist" style="display: none;">
+                    <div class="guide-hero" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                        <div class="guide-hero-icon">📊</div>
+                        <h2>Data Scientist Guide</h2>
+                        <p>Explore available features, understand data lineage, and discover 
+                        patterns for model features. Focus on feature engineering and experimentation.</p>
+                    </div>
+
+                    <div class="guide-section">
+                        <div class="guide-title">Feature Discovery Workflow</div>
+                        <div class="mermaid-container">
+                            <pre class="mermaid">
+    flowchart LR
+        A[Search Features] --> B[View Lineage]
+        B --> C[Check Statistics]
+        C --> D[Request Access]
+        D --> E[Experiment]
+        E --> F[Register New Features]
+        
+        style A fill:#3b82f6,color:#fff
+        style F fill:#10b981,color:#fff
+                            </pre>
+                        </div>
+                    </div>
+
+                    <div class="guide-section">
+                        <div class="guide-title">Using the Search & Discovery Tools</div>
+                        <div class="feature-discovery-grid">
+                            <div class="discovery-card">
+                                <div class="discovery-icon">🔍</div>
+                                <h4>Global Search</h4>
+                                <p>Search across feature names, descriptions, tags, and data sources. 
+                                Use <kbd>Ctrl+F</kbd> to quickly find features by business context.</p>
+                            </div>
+                            <div class="discovery-card">
+                                <div class="discovery-icon">🏷️</div>
+                                <h4>Tag Filtering</h4>
+                                <p>Browse features by tags like <code>#fraud</code>, <code>#recommendations</code>, 
+                                or <code>#pii</code> to find relevant feature groups.</p>
+                            </div>
+                            <div class="discovery-card">
+                                <div class="discovery-icon">🔗</div>
+                                <h4>Lineage View</h4>
+                                <p>Trace features back to source databases. Understand dependencies 
+                                and upstream data quality issues.</p>
+                            </div>
+                            <div class="discovery-card">
+                                <div class="discovery-icon">📈</div>
+                                <h4>Statistics Bar</h4>
+                                <p>Click the stats bar to see repository overview. 
+                                Check feature counts, data source coverage, and service utilization.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="guide-section">
+                        <div class="guide-title">Exploring Feature Lineage</div>
+                        <div class="mermaid-container">
+                            <pre class="mermaid">
+    flowchart TB
+        subgraph Sources["Data Sources"]
+            DB1[(User DB)]
+            DB2[(Transaction DB)]
+        end
+        
+        subgraph Entities["Entities"]
+            E1[User]
+            E2[Transaction]
+        end
+        
+        subgraph Views["Feature Views"]
+            F1[User Demographics]
+            F2[User Behavior]
+            F3[Transaction Stats]
+        end
+        
+        subgraph Services["Services"]
+            S1[Fraud Detection]
+            S2[Recommendations]
+        end
+        
+        DB1 --> E1
+        DB2 --> E2
+        E1 --> F1
+        E1 --> F2
+        E2 --> F3
+        F1 --> S1
+        F3 --> S1
+        F1 --> S2
+        F2 --> S2
+        
+        style S1 fill:#ef4444,color:#fff
+        style S2 fill:#8b5cf6,color:#fff
+                            </pre>
+                        </div>
+                        <p>Click any node in the diagram to see details. The side panel shows 
+                        upstream dependencies (inputs) and downstream consumers (outputs).</p>
+                    </div>
+
+                    <div class="guide-section">
+                        <div class="guide-title">Requesting Data Access</div>
+                        <div class="access-flow">
+                            <div class="access-step">
+                                <div class="step-badge">1</div>
+                                <p>Select a <strong>Data Source</strong> node</p>
+                            </div>
+                            <div class="access-arrow">→</div>
+                            <div class="access-step">
+                                <div class="step-badge">2</div>
+                                <p>Review <strong>Access Process</strong> in side panel</p>
+                            </div>
+                            <div class="access-arrow">→</div>
+                            <div class="access-step">
+                                <div class="step-badge">3</div>
+                                <p>Click <strong>Request Access</strong> button</p>
+                            </div>
+                            <div class="access-arrow">→</div>
+                            <div class="access-step">
+                                <div class="step-badge">4</div>
+                                <p>Track in <strong>Django Admin</strong> panel</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="guide-section">
+                        <div class="guide-title">Experimentation with AI Assistant</div>
+                        <p>Use the AI Assistant (<kbd>Ctrl+Shift+A</kbd>) to:</p>
+                        <ul>
+                            <li><strong>Generate Code:</strong> Auto-create feature definitions from descriptions</li>
+                            <li><strong>Explain Lineage:</strong> Natural language explanation of data flow</li>
+                            <li><strong>Suggest Features:</strong> Get recommendations based on your use case</li>
+                            <li><strong>Validate Design:</strong> Check for common anti-patterns</li>
+                        </ul>
+                        <div class="code-block">
+                            <pre>Example prompts:
+    • "Create features for churn prediction using user activity"
+    • "Explain the data lineage for the fraud detection service"
+    • "What features are missing for a recommendation system?"
+    • "Optimize these features for low-latency serving"</pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BACKEND API CONTEXT -->
+                <div class="guide-content" id="guide-backend" style="display: none;">
+                    <div class="guide-hero" style="background: linear-gradient(135deg, #64748b 0%, #475569 100%);">
+                        <div class="guide-hero-icon">🔧</div>
+                        <h2>Backend API Reference</h2>
+                        <p>Django REST Framework API with hash-based conflict detection, 
+                        audit logging, and LLM integration. Designed for enterprise feature store management.</p>
+                    </div>
+
+                    <div class="guide-section">
+                        <div class="guide-title">API Architecture</div>
+                        <div class="mermaid-container">
+                            <pre class="mermaid">
+    flowchart TB
+        subgraph Client["Client Layer"]
+            UI[React/Vue UI]
+            CLI[Python CLI]
+            SDK[Feast SDK]
+        end
+        
+        subgraph API["Django REST API"]
+            AUTH[Authentication]
+            RATE[Rate Limiting]
+            VIEW[ViewSets]
+            SERIAL[Serializers]
+        end
+        
+        subgraph Services["Business Logic"]
+            REPO[Repository Service]
+            SYNC[Sync Service]
+            LLM[LLM Client<br/>Groq Integration]
+            AUDIT[Audit Logger]
+        end
+        
+        subgraph Data["Data Layer"]
+            PG[(PostgreSQL)]
+            CACHE[(Redis Cache)]
+            FS[(File Storage)]
+        end
+        
+        UI -->|HTTP/JSON| AUTH
+        CLI --> AUTH
+        SDK --> AUTH
+        AUTH --> RATE --> VIEW --> SERIAL
+        VIEW --> REPO
+        VIEW --> SYNC
+        VIEW --> LLM
+        REPO --> AUDIT
+        REPO --> PG
+        SYNC --> PG
+        LLM -->|API| Groq[Groq API]
+        
+        style API fill:#3b82f6,color:#fff
+        style Groq fill:#8b5cf6,color:#fff
+                            </pre>
+                        </div>
+                    </div>
+
+                    <div class="guide-section">
+                        <div class="guide-title">Core Endpoints</div>
+                        <div class="endpoint-list">
+                            <div class="endpoint-item">
+                                <div class="endpoint-method">GET/POST</div>
+                                <div class="endpoint-path">/api/repositories/</div>
+                                <div class="endpoint-desc">List or create feature repositories</div>
+                            </div>
+                            <div class="endpoint-item">
+                                <div class="endpoint-method">GET/PUT/PATCH</div>
+                                <div class="endpoint-path">/api/repositories/{id}/</div>
+                                <div class="endpoint-desc">Retrieve or update repository with hash conflict detection</div>
+                            </div>
+                            <div class="endpoint-item">
+                                <div class="endpoint-method">POST</div>
+                                <div class="endpoint-path">/api/repositories/{id}/sync_datasources/</div>
+                                <div class="endpoint-desc">Sync data sources with architecture JSON</div>
+                            </div>
+                            <div class="endpoint-item">
+                                <div class="endpoint-method">POST</div>
+                                <div class="endpoint-path">/api/repositories/{id}/export_json/</div>
+                                <div class="endpoint-desc">Export repository with hash verification</div>
+                            </div>
+                            <div class="endpoint-item">
+                                <div class="endpoint-method">POST</div>
+                                <div class="endpoint-path">/api/repositories/import_json/</div>
+                                <div class="endpoint-desc">Import from JSON with duplicate detection</div>
+                            </div>
+                            <div class="endpoint-item">
+                                <div class="endpoint-method">GET/POST</div>
+                                <div class="endpoint-path">/api/datasources/</div>
+                                <div class="endpoint-desc">Manage data sources with filtering by kind/repo</div>
+                            </div>
+                            <div class="endpoint-item">
+                                <div class="endpoint-method">GET/POST</div>
+                                <div class="endpoint-path">/api/entities/</div>
+                                <div class="endpoint-desc">Entity definitions with repository scoping</div>
+                            </div>
+                            <div class="endpoint-item">
+                                <div class="endpoint-method">GET</div>
+                                <div class="endpoint-path">/api/audit-logs/</div>
+                                <div class="endpoint-desc">Read-only audit trail with filtering</div>
+                            </div>
+                            <div class="endpoint-item">
+                                <div class="endpoint-method">POST</div>
+                                <div class="endpoint-path">/api/chats/</div>
+                                <div class="endpoint-desc">Create LLM chat session with initial message</div>
+                            </div>
+                            <div class="endpoint-item">
+                                <div class="endpoint-method">POST</div>
+                                <div class="endpoint-path">/api/chats/{id}/send_message/</div>
+                                <div class="endpoint-desc">Send message to existing chat session</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="guide-section">
+                        <div class="guide-title">Conflict Detection & Resolution</div>
+                        <div class="conflict-flow">
+                            <div class="mermaid-container">
+                                <pre class="mermaid">
+    sequenceDiagram
+        participant Client
+        participant API
+        participant DB
+        
+        Client->>Client: Compute MD5 hash of JSON
+        Client->>API: PUT /repositories/123/ with client_hash
+        API->>DB: Fetch current hash
+        DB-->>API: server_hash
+        
+        alt Hash Match
+            API->>DB: Update repository
+            DB-->>API: Success
+            API-->>Client: 200 OK
+        else Hash Mismatch (Conflict)
+            API-->>Client: 409 Conflict
+            Note right of Client: Options:<br/>1. Fetch latest (GET)<br/>2. Force update (POST /force_update/)<br/>3. Merge changes manually
+        end
+                                </pre>
+                            </div>
+                        </div>
+                        <p>Hash-based optimistic locking prevents accidental overwrites. 
+                        Each repository stores an MD5 hash of its architecture JSON. 
+                        Updates include the client's hash; mismatches return 409 Conflict with resolution options.</p>
+                    </div>
+
+                    <div class="guide-section">
+                        <div class="guide-title">Django Models</div>
+                        <div class="model-hierarchy">
+                            <div class="model-card primary">
+                                <h4>FeastRepository</h4>
+                                <p>Core container with architecture_json, json_hash, settings</p>
+                            </div>
+                            <div class="model-children">
+                                <div class="model-card">
+                                    <h4>DataSource</h4>
+                                    <p>30+ DB types, Debezium support, column_security</p>
+                                </div>
+                                <div class="model-card">
+                                    <h4>Entity</h4>
+                                    <p>Join keys, descriptions, canvas positions</p>
+                                </div>
+                                <div class="model-card">
+                                    <h4>LLMChatSession</h4>
+                                    <p>Context snapshot, message history</p>
+                                </div>
+                            </div>
+                            <div class="model-card secondary">
+                                <h4>AuditLog</h4>
+                                <p>Immutable record of all changes with user/IP tracking</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="guide-section">
+                        <div class="guide-title">LLM Integration (Groq)</div>
+                        <div class="llm-architecture">
+                            <div class="mermaid-container">
+                                <pre class="mermaid">
+    flowchart LR
+        A[User Query] --> B[Context Builder]
+        B --> C[Prompt Engineering]
+        C --> D[Groq API<br/>llama-3.1-70b]
+        D --> E[Response Parser]
+        E --> F[Save to DB]
+        F --> G[Stream to Client]
+        
+        B -.->|Repo Context| H[(FeastRepository)]
+        
+        style D fill:#8b5cf6,color:#fff
+                            </pre>
+                            </div>
+                        </div>
+                        <p>Async LLM queries with token usage tracking. Supports streaming responses 
+                        and context-aware prompts based on repository state.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Flow Modal -->
+    <div class="modal-overlay" id="dataFlowModal">
+        <div class="modal modal-xl">
+            <div class="modal-header">
+                <div class="modal-title">🌊 Data Source Architecture</div>
+                <button class="modal-close" onclick="document.getElementById('dataFlowModal').classList.remove('active')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="guide-section">
+                    <div class="guide-title">Complete Data Flow</div>
+                    <p class="guide-text">Visual guide showing data journey from source to feature store:</p>
+                </div>
+
+                <div id="dataFlowStages">
+                    <!-- Stages populated by JS -->
+                </div>
+
+                <div class="guide-section" style="margin-top: 24px;">
+                    <div class="guide-title">Connection Health</div>
+                    <div class="detail-card">
+                        <div class="detail-row">
+                            <span class="detail-label">Debezium Connector</span>
+                            <span class="status-indicator status-healthy">
+                                <span class="status-green" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block;"></span>
+                                Healthy
+                            </span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Kafka Topic</span>
+                            <span class="status-indicator status-healthy">
+                                <span class="status-green" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block;"></span>
+                                Healthy
+                            </span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Spark Streaming</span>
+                            <span class="status-indicator status-warning">
+                                <span class="status-yellow" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block;"></span>
+                                High Latency
+                            </span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Postgres Store</span>
+                            <span class="status-indicator status-healthy">
+                                <span class="status-green" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block;"></span>
+                                Healthy
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Selector Modal -->
+    <div class="modal-overlay" id="userSelectorModal">
+        <div class="modal" style="max-width: 400px;">
+            <div class="modal-header">
+                <div class="modal-title">👤 Switch User Context</div>
+                <button class="modal-close" onclick="document.getElementById('userSelectorModal').classList.remove('active')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Select User</label>
+                    <select class="form-select" id="userSelect" onchange="diagram.switchUser()">
+                        <option value="john">John Doe (Data Engineer)</option>
+                        <option value="jane">Jane Smith (Data Scientist)</option>
+                        <option value="bob">Bob Johnson (Platform Admin)</option>
+                        <option value="alice">Alice Chen (ML Engineer)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Team</label>
+                    <select class="form-select" id="teamSelect">
+                        <option>Data Engineering</option>
+                        <option>Machine Learning</option>
+                        <option>Platform</option>
+                        <option>Analytics</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Role</label>
+                    <select class="form-select" id="roleSelect">
+                        <option>Feature Developer</option>
+                        <option>Feature Consumer</option>
+                        <option>Admin</option>
+                        <option>Viewer</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="document.getElementById('userSelectorModal').classList.remove('active')">Cancel</button>
+                <button class="btn btn-primary" onclick="diagram.applyUserContext()">Apply Context</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Push Repository Modal -->
+    <div class="modal-overlay" id="pushRepoModal">
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <div class="modal-title" id="pushModalTitle">Push Repository</div>
+                <button class="modal-close" onclick="diagram.closePushModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div id="pushModalMessage"></div>
+                <div class="status-bar" style="margin-top: 20px;">
+                    <div id="pushProgress" class="progress-bar" style="width: 0%; height: 4px; background: var(--feast-orange); transition: width 0.3s;"></div>
+                </div>
+                <div id="pushStatus" style="margin-top: 12px; font-size: 13px; color: var(--text-secondary);"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="diagram.closePushModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="notification" id="notification">
+        <div class="notification-icon" id="notifIcon">✅</div>
+        <div class="notification-content">
+            <div class="notification-title" id="notifTitle">Success</div>
+            <div class="notification-text" id="notifText">Operation completed successfully</div>
+        </div>
+    </div>
+
+    <!-- Passing Django context to JavaScript -->
+    <script>
+        // Django template variables available to JavaScript
+        window.DJANGO_CONTEXT = {
+            repoId: {{ repo_id|default:"null" }},
+            repoName: "{{ repo_name|default:''|escapejs }}",
+            repoError: "{{ repo_error|default:''|escapejs }}",
+            apiBaseUrl: "{{ api_base_url }}",
+            user: {
+                id: {{ user.id }},
+                username: "{{ user.username|escapejs }}",
+                email: "{{ user.email|escapejs }}",
+                firstName: "{{ user.first_name|escapejs }}",
+                lastName: "{{ user.last_name|escapejs }}"
+            },
+            csrfToken: "{{ csrf_token }}"
+        };
+    </script>
+
+    <!-- 
+        Module Loader - loads all JS files in correct order:
+        1. config.js, utils.js, api.js
+        2. canvas-renderer.js, node-manager.js, layout-manager.js
+        3. search-manager.js, ui-manager.js, code-generator.js
+        4. llm-helper.js, example-data.js
+        5. feast-diagram.js (main class)
+        6. main.js (creates window.diagram = new FeastDiagram('diagramCanvas'))
+    -->
+    <script src="{% static 'FeastArchitect/js/modules-loader.js' %}"></script>
+        
+
+</body>
+</html>
+
+
