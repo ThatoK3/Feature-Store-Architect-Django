@@ -97,4 +97,6 @@ docker-compose.override.yml
 # Secrets
 secrets.json
 *.pem
-*.key
+a*.key
+
+code_gen.sh
