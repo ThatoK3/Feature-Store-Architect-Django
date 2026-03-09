@@ -66,14 +66,15 @@ class APIClient {
      */
     async fetch(endpoint, options = {}) {
         const url = `${this.baseUrl}${endpoint}`;
-        const defaultOptions = {
+        const mergedOptions = {
+            ...options,
             headers: {
                 'X-CSRFToken': this.getCsrfToken(),
                 ...options.headers
             }
         };
         
-        return fetch(url, { ...defaultOptions, ...options });
+        return fetch(url, mergedOptions);
     }
 
     /**
