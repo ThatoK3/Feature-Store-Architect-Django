@@ -1252,8 +1252,6 @@ class FeastDiagram {
             }
         }
     }
-}
-
 
     // ==========================================
     // Missing Methods (from original architect.html)
@@ -3696,4 +3694,7 @@ class FeastDiagram {
     }
 
 // Make globally available for HTML onclick handlers
+
+}
+
 window.FeastDiagram = FeastDiagram;
