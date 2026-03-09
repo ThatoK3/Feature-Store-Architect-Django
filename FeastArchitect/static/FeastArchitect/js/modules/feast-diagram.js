@@ -202,7 +202,7 @@ class FeastDiagram {
      * @private
      */
     handleBeforeUnload(e) {
-        if (this.repoSettings.id && this.nodes.size > 0) {
+        if (this.repoSettings.id && this.nodes.nodes.size > 0) {
             e.preventDefault();
             e.returnValue = '';
         }
@@ -235,7 +235,7 @@ class FeastDiagram {
         this.drawEdges();
         
         // Draw nodes
-        this.nodes.forEach(node => {
+        this.nodes.nodes.forEach(node => {
             if (this.isNodeVisible(node)) {
                 this.drawNode(node);
             }
@@ -250,8 +250,8 @@ class FeastDiagram {
      */
     drawEdges() {
         this.nodes.edges.forEach(edge => {
-            const from = this.nodes.get(edge.from);
-            const to = this.nodes.get(edge.to);
+            const from = this.nodes.nodes.get(edge.from);
+            const to = this.nodes.nodes.get(edge.to);
             
             if (!from || !to) return;
             if (!this.isNodeVisible(from) || !this.isNodeVisible(to)) return;
@@ -559,7 +559,7 @@ class FeastDiagram {
             const dx = (x - this.lastMouse.x) / this.renderer.scale;
             const dy = (y - this.lastMouse.y) / this.renderer.scale;
             
-            const node = this.nodes.get(this.draggedNode);
+            const node = this.nodes.nodes.get(this.draggedNode);
             if (node) {
                 node.x += dx;
                 node.y += dy;
@@ -576,7 +576,7 @@ class FeastDiagram {
             
             if (this.hoveredNode !== prevHover) {
                 if (this.hoveredNode) {
-                    const node = this.nodes.get(this.hoveredNode);
+                    const node = this.nodes.nodes.get(this.hoveredNode);
                     this.ui.showTooltip(node, e.clientX, e.clientY, this.config.colors);
                     this.ui.setCanvasCursor('pointer');
                 } else {
@@ -671,7 +671,7 @@ class FeastDiagram {
         this.selectedNode = id;
         this.showPanel(id);
         this.updateCodeEditor();
-        this.llm.updateContext(this.nodes.get(id), this.nodes.nodes, this.config.colors);
+        this.llm.updateContext(this.nodes.nodes.get(id), this.nodes.nodes, this.config.colors);
     }
 
     /**
@@ -688,7 +688,7 @@ class FeastDiagram {
     deleteSelected() {
         if (!this.selectedNode) return;
         
-        const node = this.nodes.get(this.selectedNode);
+        const node = this.nodes.nodes.get(this.selectedNode);
         if (!node) return;
         
         if (confirm(`Are you sure you want to delete "${node.name}"?`)) {
@@ -705,7 +705,7 @@ class FeastDiagram {
      * @param {string} id - Node ID
      */
     centerOnNode(id) {
-        const node = this.nodes.get(id);
+        const node = this.nodes.nodes.get(id);
         if (!node) return;
         
         const transform = this.layout.calculateCenterTransform(
@@ -820,7 +820,7 @@ class FeastDiagram {
             }
             
             // Load backend entities as nodes if empty
-            if (this.nodes.size === 0) {
+            if (this.nodes.nodes.size === 0) {
                 if (data.data_sources) {
                     data.data_sources.forEach(ds => this.addDataSourceFromBackend(ds));
                 }
@@ -939,7 +939,7 @@ class FeastDiagram {
             } else {
                 const data = {
                     repository: this.repoSettings,
-                    nodes: Array.from(this.nodes.entries()),
+                    nodes: Array.from(this.nodes.nodes.entries()),
                     edges: this.nodes.edges,
                     exportDate: new Date().toISOString(),
                     version: '3.0'
@@ -977,7 +977,7 @@ class FeastDiagram {
                     this.nodes.importFromJSON(data.architecture || data);
                     this.updateStats();
                     this.fit();
-                    this.ui.showNotification('Imported', `Loaded ${this.nodes.size} components`);
+                    this.ui.showNotification('Imported', `Loaded ${this.nodes.nodes.size} components`);
                 }
             } catch (error) {
                 if (error.isConflict) {
@@ -1009,7 +1009,7 @@ class FeastDiagram {
      * Reset diagram to example data
      */
     reset() {
-        this.nodes.clear();
+        this.nodes.nodes.clear();
         this.selectedNode = null;
         this.closePanel();
         
@@ -1038,7 +1038,7 @@ class FeastDiagram {
         const isOpen = this.ui.togglePanel('llm');
         if (isOpen) {
             this.llm.initialize();
-            this.llm.updateContext(this.selectedNode ? this.nodes.get(this.selectedNode) : null, 
+            this.llm.updateContext(this.selectedNode ? this.nodes.nodes.get(this.selectedNode) : null, 
                 this.nodes.nodes, this.config.colors);
         }
     }
@@ -1077,7 +1077,7 @@ class FeastDiagram {
     }
 
     showEditModal(id) {
-        const node = this.nodes.get(id);
+        const node = this.nodes.nodes.get(id);
         if (!node) return;
         
         this.editingNode = id;
