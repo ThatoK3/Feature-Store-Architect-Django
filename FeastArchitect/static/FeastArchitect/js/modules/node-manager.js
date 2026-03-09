@@ -455,6 +455,16 @@ class NodeManager {
             version: '3.0'
         };
     }
+
+    // Map proxy methods - allow FeastDiagram to use this.nodes like a Map
+    get(id) { return this.nodes.get(id); }
+    has(id) { return this.nodes.has(id); }
+    set(id, node) { return this.nodes.set(id, node); }
+    forEach(fn) { return this.nodes.forEach(fn); }
+    values() { return this.nodes.values(); }
+    keys() { return this.nodes.keys(); }
+    entries() { return this.nodes.entries(); }
+    get size() { return this.nodes.size; }
 }
 
 // Export for use in other modules
