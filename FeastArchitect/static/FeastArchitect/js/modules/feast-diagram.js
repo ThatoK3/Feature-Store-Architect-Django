@@ -202,7 +202,7 @@ class FeastDiagram {
      * @private
      */
     handleBeforeUnload(e) {
-        if (this.repoSettings.id && this.nodes.nodes.size > 0) {
+        if (this.repoSettings.id && this.nodes.size > 0) {
             e.preventDefault();
             e.returnValue = '';
         }
@@ -235,7 +235,7 @@ class FeastDiagram {
         this.drawEdges();
         
         // Draw nodes
-        this.nodes.nodes.forEach(node => {
+        this.nodes.forEach(node => {
             if (this.isNodeVisible(node)) {
                 this.drawNode(node);
             }
@@ -250,8 +250,8 @@ class FeastDiagram {
      */
     drawEdges() {
         this.nodes.edges.forEach(edge => {
-            const from = this.nodes.nodes.get(edge.from);
-            const to = this.nodes.nodes.get(edge.to);
+            const from = this.nodes.get(edge.from);
+            const to = this.nodes.get(edge.to);
             
             if (!from || !to) return;
             if (!this.isNodeVisible(from) || !this.isNodeVisible(to)) return;
@@ -559,7 +559,7 @@ class FeastDiagram {
             const dx = (x - this.lastMouse.x) / this.renderer.scale;
             const dy = (y - this.lastMouse.y) / this.renderer.scale;
             
-            const node = this.nodes.nodes.get(this.draggedNode);
+            const node = this.nodes.get(this.draggedNode);
             if (node) {
                 node.x += dx;
                 node.y += dy;
@@ -576,7 +576,7 @@ class FeastDiagram {
             
             if (this.hoveredNode !== prevHover) {
                 if (this.hoveredNode) {
-                    const node = this.nodes.nodes.get(this.hoveredNode);
+                    const node = this.nodes.get(this.hoveredNode);
                     this.ui.showTooltip(node, e.clientX, e.clientY, this.config.colors);
                     this.ui.setCanvasCursor('pointer');
                 } else {
@@ -671,47 +671,7 @@ class FeastDiagram {
         this.selectedNode = id;
         this.showPanel(id);
         this.updateCodeEditor();
-        this.llm.updateContext(this.nodes.nodes.get(id), this.nodes.nodes, this.config.colors);
-    }
-
-    /**
-     * Show detail panel for node
-     * @param {string} id - Node ID
-     */
-    showPanel(id) {
-        const node = this.nodes.nodes.get(id);
-        if (!node) return;
-        
-        // Build panel content
-        const content = this.buildPanelContent(node);
-        
-        // Update UI
-        this.ui.togglePanel('detail', true);
-        
-        // Populate panel (implementation depends on HTML structure)
-        this.populateDetailPanel(node, content);
-    }
-
-    /**
-     * Build HTML content for detail panel
-     * @private
-     */
-    buildPanelContent(node) {
-        // This would build the comprehensive panel HTML
-        // Implementation matches original showPanel method
-        return '';
-    }
-
-    /**
-     * Populate detail panel DOM
-     * @private
-     */
-    populateDetailPanel(node, content) {
-        // Implementation matches original panel population
-        const panelContent = document.getElementById('panelContent');
-        if (panelContent) {
-            panelContent.innerHTML = content;
-        }
+        this.llm.updateContext(this.nodes.get(id), this.nodes.nodes, this.config.colors);
     }
 
     /**
@@ -728,7 +688,7 @@ class FeastDiagram {
     deleteSelected() {
         if (!this.selectedNode) return;
         
-        const node = this.nodes.nodes.get(this.selectedNode);
+        const node = this.nodes.get(this.selectedNode);
         if (!node) return;
         
         if (confirm(`Are you sure you want to delete "${node.name}"?`)) {
@@ -745,7 +705,7 @@ class FeastDiagram {
      * @param {string} id - Node ID
      */
     centerOnNode(id) {
-        const node = this.nodes.nodes.get(id);
+        const node = this.nodes.get(id);
         if (!node) return;
         
         const transform = this.layout.calculateCenterTransform(
@@ -860,7 +820,7 @@ class FeastDiagram {
             }
             
             // Load backend entities as nodes if empty
-            if (this.nodes.nodes.size === 0) {
+            if (this.nodes.size === 0) {
                 if (data.data_sources) {
                     data.data_sources.forEach(ds => this.addDataSourceFromBackend(ds));
                 }
@@ -979,7 +939,7 @@ class FeastDiagram {
             } else {
                 const data = {
                     repository: this.repoSettings,
-                    nodes: Array.from(this.nodes.nodes.entries()),
+                    nodes: Array.from(this.nodes.entries()),
                     edges: this.nodes.edges,
                     exportDate: new Date().toISOString(),
                     version: '3.0'
@@ -1017,7 +977,7 @@ class FeastDiagram {
                     this.nodes.importFromJSON(data.architecture || data);
                     this.updateStats();
                     this.fit();
-                    this.ui.showNotification('Imported', `Loaded ${this.nodes.nodes.size} components`);
+                    this.ui.showNotification('Imported', `Loaded ${this.nodes.size} components`);
                 }
             } catch (error) {
                 if (error.isConflict) {
@@ -1078,7 +1038,7 @@ class FeastDiagram {
         const isOpen = this.ui.togglePanel('llm');
         if (isOpen) {
             this.llm.initialize();
-            this.llm.updateContext(this.selectedNode ? this.nodes.nodes.get(this.selectedNode) : null, 
+            this.llm.updateContext(this.selectedNode ? this.nodes.get(this.selectedNode) : null, 
                 this.nodes.nodes, this.config.colors);
         }
     }
@@ -1117,7 +1077,7 @@ class FeastDiagram {
     }
 
     showEditModal(id) {
-        const node = this.nodes.nodes.get(id);
+        const node = this.nodes.get(id);
         if (!node) return;
         
         this.editingNode = id;
@@ -1139,27 +1099,6 @@ class FeastDiagram {
     // ==========================================
     // Update Methods
     // ==========================================
-
-    updateStats() {
-        const stats = {
-            datasource: 0,
-            entity: 0,
-            featureview: 0,
-            service: 0,
-            features: 0
-        };
-        
-        this.nodes.nodes.forEach(node => {
-            if (stats[node.type] !== undefined) {
-                stats[node.type]++;
-            }
-            if (node.features && Array.isArray(node.features)) {
-                stats.features += node.features.length;
-            }
-        });
-        
-        this.ui.updateStats(stats);
-    }
 
     updateCodeEditor() {
         if (!this.ui.panels.codeEditor) return;
@@ -1839,7 +1778,7 @@ class FeastDiagram {
                             const entitySelect = document.getElementById('inputEntities');
                             const selectedEntities = Array.from(entitySelect.selectedOptions).map(o => o.value);
                             
-                            this.edges = this.edges.filter(e => e.to !== this.editingNode);
+                            this.nodes.edges = this.nodes.edges.filter(e => e.to !== this.editingNode);
                             node.inputs = [];
                             
                             node.entities = selectedEntities;
@@ -1851,7 +1790,7 @@ class FeastDiagram {
                             const fsSelect = document.getElementById('inputFeatureServices');
                             const selectedFSs = fsSelect ? Array.from(fsSelect.selectedOptions).map(o => o.value) : [];
                             
-                            this.edges = this.edges.filter(e => e.to !== this.editingNode);
+                            this.nodes.edges = this.nodes.edges.filter(e => e.to !== this.editingNode);
                             node.inputs = [];
                             
                             node.features = selectedFVs;
@@ -2071,7 +2010,7 @@ class FeastDiagram {
                         return;
                     }
                     
-                    const exists = this.edges.some(e => e.from === fromId && e.to === toId);
+                    const exists = this.nodes.edges.some(e => e.from === fromId && e.to === toId);
                     if (exists) {
                         alert('Connection already exists');
                         return;
@@ -2767,15 +2706,15 @@ class FeastDiagram {
                     const fromSelect = document.getElementById('edgeFromSelect');
                     const toSelect = document.getElementById('edgeToSelect');
                     
-                    const totalEdges = this.edges.length;
-                    const validEdges = this.edges.filter(e => this.nodes.has(e.from) && this.nodes.has(e.to)).length;
+                    const totalEdges = this.nodes.edges.length;
+                    const validEdges = this.nodes.edges.filter(e => this.nodes.has(e.from) && this.nodes.has(e.to)).length;
                     const orphanedEdges = totalEdges - validEdges;
                     
                     document.getElementById('edgeCountTotal').textContent = totalEdges;
                     document.getElementById('edgeCountValid').textContent = validEdges;
                     document.getElementById('edgeCountOrphaned').textContent = orphanedEdges;
                     
-                    if (this.edges.length === 0) {
+                    if (this.nodes.edges.length === 0) {
                         edgeList.innerHTML = `
                             <div class="empty-state" style="padding: 40px 20px;">
                                 <div class="empty-icon">🔗</div>
@@ -2784,7 +2723,7 @@ class FeastDiagram {
                             </div>
                         `;
                     } else {
-                        edgeList.innerHTML = this.edges.map(edge => {
+                        edgeList.innerHTML = this.nodes.edges.map(edge => {
                             const fromNode = this.nodes.get(edge.from);
                             const toNode = this.nodes.get(edge.to);
                             const isValid = fromNode && toNode;
@@ -2868,12 +2807,12 @@ class FeastDiagram {
     deleteEdge(edgeId) {
                     if (!confirm('Are you sure you want to delete this connection?')) return;
                     
-                    const edgeIndex = this.edges.findIndex(e => e.id === edgeId);
+                    const edgeIndex = this.nodes.edges.findIndex(e => e.id === edgeId);
                     if (edgeIndex === -1) return;
                     
-                    const edge = this.edges[edgeIndex];
+                    const edge = this.nodes.edges[edgeIndex];
                     
-                    this.edges.splice(edgeIndex, 1);
+                    this.nodes.edges.splice(edgeIndex, 1);
                     
                     const fromNode = this.nodes.get(edge.from);
                     const toNode = this.nodes.get(edge.to);
@@ -3102,7 +3041,7 @@ class FeastDiagram {
                     if (!this.selectedNode) {
                         const stats = {
                             nodes: this.nodes.size,
-                            edges: this.edges.length,
+                            edges: this.nodes.edges.length,
                             sources: Array.from(this.nodes.values()).filter(n => n.type === 'datasource').length,
                             entities: Array.from(this.nodes.values()).filter(n => n.type === 'entity').length,
                             views: Array.from(this.nodes.values()).filter(n => n.type === 'featureview').length,
