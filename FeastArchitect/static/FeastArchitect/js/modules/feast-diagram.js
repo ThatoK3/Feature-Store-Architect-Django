@@ -1197,7 +1197,7 @@ class FeastDiagram {
     // ==========================================
 
     showPanel(id) {
-                    const node = this.nodes.get(id);
+                    const node = this.nodes.nodes.get(id);
                     const panel = document.getElementById('detailPanel');
                     const config = this.config.colors[node.type];
                     
@@ -1383,7 +1383,7 @@ class FeastDiagram {
                     
                     if (node.inputs.length > 0) {
                         node.inputs.forEach(inputId => {
-                            const input = this.nodes.get(inputId);
+                            const input = this.nodes.nodes.get(inputId);
                             if (input && this.isNodeVisible(input)) {
                                 const inputConfig = this.config.colors[input.type];
                                 let inputIcon = inputConfig.icon;
@@ -1420,7 +1420,7 @@ class FeastDiagram {
                     
                     if (node.outputs.length > 0) {
                         node.outputs.forEach(outputId => {
-                            const output = this.nodes.get(outputId);
+                            const output = this.nodes.nodes.get(outputId);
                             if (output && this.isNodeVisible(output)) {
                                 const outputConfig = this.config.colors[output.type];
                                 let outputIcon = outputConfig.icon;
@@ -1599,7 +1599,7 @@ class FeastDiagram {
                             </div>
                         `;
                     } else if (type === 'featureview') {
-                        const entities = Array.from(this.nodes.values())
+                        const entities = Array.from(this.nodes.nodes.values())
                             .filter(n => n.type === 'entity')
                             .map(e => `<option value="${e.id}" ${existingNode?.entities?.includes(e.id) ? 'selected' : ''}>${e.name}</option>`)
                             .join('');
@@ -1659,12 +1659,12 @@ class FeastDiagram {
                             </div>
                         `;
                     } else if (type === 'service') {
-                        const views = Array.from(this.nodes.values())
+                        const views = Array.from(this.nodes.nodes.values())
                             .filter(n => n.type === 'featureview')
                             .map(v => `<option value="${v.id}" ${existingNode?.features?.includes(v.id) ? 'selected' : ''}>${v.name}</option>`)
                             .join('');
                         
-                        const services = Array.from(this.nodes.values())
+                        const services = Array.from(this.nodes.nodes.values())
                             .filter(n => n.type === 'service' && n.id !== existingNode?.id)
                             .map(s => `<option value="${s.id}" ${existingNode?.featureServices?.includes(s.id) ? 'selected' : ''}>${s.name}</option>`)
                             .join('');
@@ -1753,7 +1753,7 @@ class FeastDiagram {
                     };
                     
                     if (this.editingNode) {
-                        const node = this.nodes.get(this.editingNode);
+                        const node = this.nodes.nodes.get(this.editingNode);
                         node.name = name;
                         node.description = description;
                         node.tags = [...this.tempTags];
@@ -1938,7 +1938,7 @@ class FeastDiagram {
                         service: { count: 0, items: [], color: '#f97316', icon: '🚀' }
                     };
                     
-                    this.nodes.forEach((node, id) => {
+                    this.nodes.nodes.forEach((node, id) => {
                         if (stats[node.type]) {
                             stats[node.type].count++;
                             stats[node.type].items.push(node.name);
@@ -1972,7 +1972,7 @@ class FeastDiagram {
                         <div class="file-tree-item dir">${this.repoSettings.name}/</div>
                         <div class="file-tree-item dir" style="padding-left: 40px;">data/</div>
                         <div class="file-tree-item" style="padding-left: 60px;">registry.db</div>
-                        ${Array.from(this.nodes.values()).filter(n => n.type === 'datasource').map(n => 
+                        ${Array.from(this.nodes.nodes.values()).filter(n => n.type === 'datasource').map(n => 
                             `<div class="file-tree-item" style="padding-left: 60px;">${n.name.toLowerCase().replace(/\s+/g, '_')}.parquet</div>`
                         ).join('')}
                         <div class="file-tree-item" style="padding-left: 40px;">entities.py</div>
@@ -2016,8 +2016,8 @@ class FeastDiagram {
                         return;
                     }
                     
-                    const fromNode = this.nodes.get(fromId);
-                    const toNode = this.nodes.get(toId);
+                    const fromNode = this.nodes.nodes.get(fromId);
+                    const toNode = this.nodes.nodes.get(toId);
                     
                     const validConnections = {
                         'entity': ['featureview'],
@@ -2187,7 +2187,7 @@ class FeastDiagram {
     saveUsageDetails() {
                     if (this.editingUsage === null) return;
                     
-                    const node = this.nodes.get(this.selectedNode);
+                    const node = this.nodes.nodes.get(this.selectedNode);
                     if (!node) return;
                     
                     const updatedApp = {
@@ -2210,7 +2210,7 @@ class FeastDiagram {
                 }
 
     showUsageDetails(idx) {
-                    const node = this.nodes.get(this.selectedNode);
+                    const node = this.nodes.nodes.get(this.selectedNode);
                     if (!node || !node.details.usedBy || !node.details.usedBy[idx]) return;
                     
                     const app = typeof node.details.usedBy[idx] === 'string' 
@@ -2412,7 +2412,7 @@ class FeastDiagram {
 
     async askLLM(promptType) {
                     const messagesContainer = document.getElementById('llmMessages');
-                    const context = this.selectedNode ? this.nodes.get(this.selectedNode) : null;
+                    const context = this.selectedNode ? this.nodes.nodes.get(this.selectedNode) : null;
                     
                     let userMessage = '';
                     
@@ -2565,7 +2565,7 @@ class FeastDiagram {
                         assistantMsgDiv.className = 'llm-message assistant';
                         assistantMsgDiv.innerHTML = `
                             <p>I've analyzed your question about "${message}".</p>
-                            <p>Based on your current architecture with ${this.nodes.size} components, I recommend reviewing the data lineage from sources to services to ensure consistency.</p>
+                            <p>Based on your current architecture with ${this.nodes.nodes.size} components, I recommend reviewing the data lineage from sources to services to ensure consistency.</p>
                             <p>Would you like me to:</p>
                             <ul style="margin-left: 20px; margin-top: 8px;">
                                 <li>Generate specific code for a component</li>
@@ -2627,7 +2627,7 @@ class FeastDiagram {
                 }
 
     async requestAccess(nodeId) {
-                    const node = this.nodes.get(nodeId);
+                    const node = this.nodes.nodes.get(nodeId);
                     if (!node) return;
                     
                     // Find the backend data source ID if it exists
@@ -2707,7 +2707,7 @@ class FeastDiagram {
                     const toSelect = document.getElementById('edgeToSelect');
                     
                     const totalEdges = this.nodes.edges.length;
-                    const validEdges = this.nodes.edges.filter(e => this.nodes.has(e.from) && this.nodes.has(e.to)).length;
+                    const validEdges = this.nodes.edges.filter(e => this.nodes.nodes.has(e.from) && this.nodes.nodes.has(e.to)).length;
                     const orphanedEdges = totalEdges - validEdges;
                     
                     document.getElementById('edgeCountTotal').textContent = totalEdges;
@@ -2724,8 +2724,8 @@ class FeastDiagram {
                         `;
                     } else {
                         edgeList.innerHTML = this.nodes.edges.map(edge => {
-                            const fromNode = this.nodes.get(edge.from);
-                            const toNode = this.nodes.get(edge.to);
+                            const fromNode = this.nodes.nodes.get(edge.from);
+                            const toNode = this.nodes.nodes.get(edge.to);
                             const isValid = fromNode && toNode;
                             
                             if (!isValid) {
@@ -2791,7 +2791,7 @@ class FeastDiagram {
                         }).join('');
                     }
                     
-                    const nodeOptions = Array.from(this.nodes.values()).map(node => {
+                    const nodeOptions = Array.from(this.nodes.nodes.values()).map(node => {
                         const config = this.config.colors[node.type];
                         let icon = config.icon;
                         if (node.type === 'datasource' && node.dbType && node.dbType.icon) {
@@ -2814,8 +2814,8 @@ class FeastDiagram {
                     
                     this.nodes.edges.splice(edgeIndex, 1);
                     
-                    const fromNode = this.nodes.get(edge.from);
-                    const toNode = this.nodes.get(edge.to);
+                    const fromNode = this.nodes.nodes.get(edge.from);
+                    const toNode = this.nodes.nodes.get(edge.to);
                     
                     if (fromNode) {
                         fromNode.outputs = fromNode.outputs.filter(id => id !== edge.to);
@@ -2910,7 +2910,7 @@ class FeastDiagram {
                     
                     // Update permissions based on actual data sources
                     const permsContainer = document.getElementById('djangoPermissions');
-                    const datasources = Array.from(this.nodes.values()).filter(n => n.type === 'datasource');
+                    const datasources = Array.from(this.nodes.nodes.values()).filter(n => n.type === 'datasource');
                     
                     permsContainer.innerHTML = datasources.map(ds => {
                         const perm = this.calculatePermission(ds);
@@ -2935,8 +2935,8 @@ class FeastDiagram {
                     
                     // Column security - use actual node data
                     const colContainer = document.getElementById('djangoColumnSecurity');
-                    if (this.selectedNode && this.nodes.get(this.selectedNode)?.type === 'datasource') {
-                        const node = this.nodes.get(this.selectedNode);
+                    if (this.selectedNode && this.nodes.nodes.get(this.selectedNode)?.type === 'datasource') {
+                        const node = this.nodes.nodes.get(this.selectedNode);
                         const columns = node.columnSecurity || { piiColumns: [], maskedColumns: [], restrictedColumns: [] };
                         
                         colContainer.innerHTML = `
@@ -3040,12 +3040,12 @@ class FeastDiagram {
                     
                     if (!this.selectedNode) {
                         const stats = {
-                            nodes: this.nodes.size,
+                            nodes: this.nodes.nodes.size,
                             edges: this.nodes.edges.length,
-                            sources: Array.from(this.nodes.values()).filter(n => n.type === 'datasource').length,
-                            entities: Array.from(this.nodes.values()).filter(n => n.type === 'entity').length,
-                            views: Array.from(this.nodes.values()).filter(n => n.type === 'featureview').length,
-                            services: Array.from(this.nodes.values()).filter(n => n.type === 'service').length
+                            sources: Array.from(this.nodes.nodes.values()).filter(n => n.type === 'datasource').length,
+                            entities: Array.from(this.nodes.nodes.values()).filter(n => n.type === 'entity').length,
+                            views: Array.from(this.nodes.nodes.values()).filter(n => n.type === 'featureview').length,
+                            services: Array.from(this.nodes.nodes.values()).filter(n => n.type === 'service').length
                         };
                         
                         container.innerHTML = `
@@ -3067,7 +3067,7 @@ class FeastDiagram {
                             </div>
                         `;
                     } else {
-                        const node = this.nodes.get(this.selectedNode);
+                        const node = this.nodes.nodes.get(this.selectedNode);
                         const config = this.config.colors[node.type];
                         
                         let icon = config.icon;
@@ -3161,7 +3161,7 @@ class FeastDiagram {
                         features: 0
                     };
                     
-                    this.nodes.forEach(node => {
+                    this.nodes.nodes.forEach(node => {
                         if (stats[node.type] !== undefined) {
                             stats[node.type]++;
                         }
@@ -3178,7 +3178,7 @@ class FeastDiagram {
                 }
 
     showTooltip(nodeId, x, y) {
-                    const node = this.nodes.get(nodeId);
+                    const node = this.nodes.nodes.get(nodeId);
                     const tooltip = document.getElementById('tooltip');
                     
                     let icon = this.config.colors[node.type].icon;
@@ -3367,7 +3367,7 @@ class FeastDiagram {
     performSearch(query) {
                     const results = [];
                     
-                    this.nodes.forEach((node, id) => {
+                    this.nodes.nodes.forEach((node, id) => {
                         if (node.name.toLowerCase().includes(query)) {
                             results.push({
                                 type: 'node',
@@ -3487,7 +3487,7 @@ class FeastDiagram {
                         sparkPattern: dbType.sparkPattern,
                         columnSecurity: config.columnSecurity || this.generateDefaultColumnSecurity()
                     };
-                    this.nodes.set(id, node);
+                    this.nodes.nodes.set(id, node);
                     this.updateStats();
                     return id;
                 }
@@ -3508,7 +3508,7 @@ class FeastDiagram {
                         outputs: [],
                         createdAt: new Date().toISOString()
                     };
-                    this.nodes.set(id, node);
+                    this.nodes.nodes.set(id, node);
                     this.updateStats();
                     return id;
                 }
@@ -3531,11 +3531,11 @@ class FeastDiagram {
                         outputs: [],
                         createdAt: new Date().toISOString()
                     };
-                    this.nodes.set(id, node);
+                    this.nodes.nodes.set(id, node);
                     
                     if (config.entities) {
                         config.entities.forEach(entityId => {
-                            if (this.nodes.has(entityId)) {
+                            if (this.nodes.nodes.has(entityId)) {
                                 this.addConnection(entityId, id);
                             }
                         });
@@ -3562,18 +3562,18 @@ class FeastDiagram {
                         outputs: [],
                         createdAt: new Date().toISOString()
                     };
-                    this.nodes.set(id, node);
+                    this.nodes.nodes.set(id, node);
                     
                     if (config.features) {
                         config.features.forEach(fvId => {
-                            if (this.nodes.has(fvId)) {
+                            if (this.nodes.nodes.has(fvId)) {
                                 this.addConnection(fvId, id);
                             }
                         });
                     }
                     if (config.featureServices) {
                         config.featureServices.forEach(fsId => {
-                            if (this.nodes.has(fsId)) {
+                            if (this.nodes.nodes.has(fsId)) {
                                 this.addConnection(fsId, id);
                             }
                         });
@@ -3600,7 +3600,7 @@ class FeastDiagram {
         features=[
             ${node.features.slice(0, 2).map(f => `<span class="code-string">"${node.name}:${f.name}"</span>`).join(',\n        ')}${node.features.length > 2 ? ',' : ''}
         ],
-        entity_rows=[{<span class="code-string">"${this.nodes.get(node.entities[0])?.joinKey || 'id'}"</span>: <span class="code-string">"123"</span>}]
+        entity_rows=[{<span class="code-string">"${this.nodes.nodes.get(node.entities[0])?.joinKey || 'id'}"</span>: <span class="code-string">"123"</span>}]
     ).to_df()`;
                     } else if (node.type === 'service') {
                         return `<span class="code-comment"># Use feature service</span>
