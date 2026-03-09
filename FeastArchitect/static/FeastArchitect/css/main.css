@@ -92,7 +92,9 @@
             width: 40px;
             height: 40px;
             border-radius: 10px;
-            background: url({% static 'FeastArchitect/images/disc-logo.png' %}) center / contain no-repeat;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
             display: flex;
             align-items: center;
             justify-content: center;
