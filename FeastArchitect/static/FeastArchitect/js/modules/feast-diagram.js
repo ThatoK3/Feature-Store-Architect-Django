@@ -894,49 +894,125 @@ class FeastDiagram {
      * Push repository to backend
      */
     async pushRepo() {
-        const confirmed = confirm(
-            this.repoSettings.id 
-                ? `Update repository "${this.repoSettings.name}"?`
-                : 'Create new repository?'
-        );
+        const repoId = this.repoSettings.id;
+        const repoName = this.repoSettings.name;
         
-        if (!confirmed) return;
+        // Confirmation based on repo ID presence
+        if (!repoId) {
+            if (!confirm('No repository ID found. Are you sure you want to create a new repository?')) {
+                return;
+            }
+        } else {
+            if (!confirm(`Are you sure you want to update repository "${repoName}"?`)) {
+                return;
+            }
+        }
         
-        this.ui.toggleModal('pushRepo', true);
-        this.ui.updatePushProgress(0, 'Initializing...');
+        // Show modal with progress
+        const modal = document.getElementById('pushRepoModal');
+        document.getElementById('pushModalMessage').innerHTML = repoId 
+            ? `Updating repository "${repoName}"...` 
+            : 'Creating new repository...';
+        document.getElementById('pushProgress').style.width = '0%';
+        document.getElementById('pushStatus').innerHTML = 'Initializing...';
+        modal.classList.add('active');
         
+        // Prepare payload
         const payload = {
             name: this.repoSettings.name,
             location: this.repoSettings.location,
             description: this.repoSettings.description,
             default_owner: this.repoSettings.defaultOwner,
-            architecture_json: this.nodes.exportToJSON(),
+            architecture_json: this.exportToJSON(),
             settings: this.search.settings
         };
         
+        // Add hash for conflict detection if updating
+        if (repoId) {
+            // Compute simple hash of current state
+            const stateStr = JSON.stringify(this.exportToJSON());
+            payload.client_hash = SparkMD5.hash(stateStr);
+            payload.client_timestamp = new Date().toISOString();
+        }
+        
         try {
-            this.ui.updatePushProgress(30, 'Sending to server...');
+            document.getElementById('pushProgress').style.width = '30%';
+            document.getElementById('pushStatus').innerHTML = 'Sending to server...';
             
             let response;
-            if (this.repoSettings.id) {
-                response = await this.api.updateRepository(this.repoSettings.id, payload);
+            
+            if (repoId) {
+                // Update existing
+                response = await fetch(`${this.api.baseUrl}/repositories/${repoId}/`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': this.getCsrfToken()
+                    },
+                    body: JSON.stringify(payload)
+                });
             } else {
-                response = await this.api.createRepository(payload);
-                this.repoSettings.id = response.id;
-                
-                // Update URL
-                const newUrl = new URL(window.location);
-                newUrl.searchParams.set('repo_id', response.id);
-                window.history.pushState({}, '', newUrl);
+                // Create new
+                response = await fetch(`${this.api.baseUrl}/repositories/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': this.getCsrfToken()
+                    },
+                    body: JSON.stringify(payload)
+                });
             }
             
-            this.ui.updatePushProgress(100, 'Success!', 'success');
-            this.ui.showNotification('Push Successful', 
-                this.repoSettings.id ? 'Repository updated' : 'Repository created');
+            document.getElementById('pushProgress').style.width = '70%';
+            document.getElementById('pushStatus').innerHTML = 'Processing response...';
+            
+            const data = await response.json();
+            
+            if (!response.ok) {
+                // Handle specific error cases
+                if (response.status === 409) {
+                    // Conflict detected
+                    document.getElementById('pushStatus').innerHTML = 
+                        `❌ Conflict: ${data.detail || 'Repository modified by another session'}`;
+                    document.getElementById('pushProgress').style.backgroundColor = 'var(--feast-red)';
+                    
+                    // Offer force update option
+                    if (confirm('Conflict detected. Force overwrite server version?')) {
+                        await this.forcePushRepo(payload);
+                        return;
+                    }
+                    return;
+                }
+                throw new Error(data.detail || `HTTP ${response.status}`);
+            }
+            
+            // Success
+            document.getElementById('pushProgress').style.width = '100%';
+            document.getElementById('pushProgress').style.backgroundColor = 'var(--feast-green)';
+            
+            if (!repoId) {
+                // New repo created
+                this.repoSettings.id = data.id;
+                // Update URL without reload
+                const newUrl = new URL(window.location);
+                newUrl.searchParams.set('repo_id', data.id);
+                window.history.pushState({}, '', newUrl);
+                document.getElementById('pushStatus').innerHTML = 
+                    `✅ Repository created! ID: ${data.id}`;
+            } else {
+                document.getElementById('pushStatus').innerHTML = 
+                    `✅ Repository "${repoName}" updated successfully!`;
+            }
+            
+            this.updateRepoSubtitle();
+            this.showNotification('Push Successful', 
+                `Repository ${repoId ? 'updated' : 'created'}`);
             
         } catch (error) {
             console.error('Push failed:', error);
-            this.ui.updatePushProgress(100, `Error: ${error.message}`, 'error');
+            document.getElementById('pushStatus').innerHTML = 
+                `❌ Error: ${error.message}`;
+            document.getElementById('pushProgress').style.backgroundColor = 'var(--feast-red)';
         }
     }
 
@@ -1913,9 +1989,9 @@ class FeastDiagram {
                     document.getElementById('settingsModal').classList.remove('active');
                     
                     // Persist to backend if we have a repo ID
-                    if (this.repoId) {
+                    if (this.repoSettings.id) {
                         try {
-                            const response = await fetch(`${this.apiBaseUrl}/repositories/${this.repoId}/`, {
+                            const response = await fetch(`${this.api.baseUrl}/repositories/${this.repoSettings.id}/`, {
                                 method: 'PATCH',
                                 headers: {
                                     'Content-Type': 'application/json',
@@ -2295,7 +2371,7 @@ class FeastDiagram {
                 }
 
     async refreshRepo() {
-                    if (!this.repoId) {
+                    if (!this.repoSettings.id) {
                         this.showNotification('Error', 'No repository ID to refresh');
                         return;
                     }
@@ -2303,7 +2379,7 @@ class FeastDiagram {
                     this.showNotification('Refresh', 'Fetching latest repository state...');
                     
                     try {
-                        const response = await fetch(`${this.apiBaseUrl}/repositories/${this.repoId}/check_status/`);
+                        const response = await fetch(`${this.api.baseUrl}/repositories/${this.repoSettings.id}/check_status/`);
                         
                         if (!response.ok) {
                             throw new Error(`HTTP ${response.status}`);
@@ -2466,14 +2542,14 @@ class FeastDiagram {
                     if (!this.currentChatSession) {
                         // Create new session via backend
                         try {
-                            const response = await fetch(`${this.apiBaseUrl}/chats/`, {
+                            const response = await fetch(`${this.api.baseUrl}/chats/`, {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
                                     'X-CSRFToken': this.getCsrfToken()
                                 },
                                 body: JSON.stringify({
-                                    repository_id: this.repoId,
+                                    repository_id: this.repoSettings.id,
                                     title: `Chat about ${this.repoSettings.name}`,
                                     initial_message: userMessage,
                                     query_type: promptType
@@ -2521,7 +2597,7 @@ class FeastDiagram {
                     
                     // Existing session - send message
                     try {
-                        const response = await fetch(`${this.apiBaseUrl}/chats/${this.currentChatSession}/send_message/`, {
+                        const response = await fetch(`${this.api.baseUrl}/chats/${this.currentChatSession}/send_message/`, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -2663,7 +2739,7 @@ class FeastDiagram {
                     
                     try {
                         // Create audit log entry for access request
-                        const response = await fetch(`${this.apiBaseUrl}/audit-logs/`, {
+                        const response = await fetch(`${this.api.baseUrl}/audit-logs/`, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -2863,7 +2939,7 @@ class FeastDiagram {
     async updateDjangoPanel() {
                     // Fetch current user from backend
                     try {
-                        const userResponse = await fetch(`${this.apiBaseUrl}/auth/user/`);
+                        const userResponse = await fetch(`${this.api.baseUrl}/auth/user/`);
                         if (userResponse.ok) {
                             const userData = await userResponse.json();
                             this.currentUser = {
@@ -2884,7 +2960,7 @@ class FeastDiagram {
                     
                     // Fetch real audit logs
                     try {
-                        const auditResponse = await fetch(`${this.apiBaseUrl}/audit-logs/?limit=10`);
+                        const auditResponse = await fetch(`${this.api.baseUrl}/audit-logs/?limit=10`);
                         if (auditResponse.ok) {
                             const auditData = await auditResponse.json();
                             const auditContainer = document.getElementById('djangoAuditLog');
@@ -3022,7 +3098,7 @@ class FeastDiagram {
                     document.getElementById('pushStatus').innerHTML = 'Force updating...';
                     
                     try {
-                        const response = await fetch(`${this.apiBaseUrl}/repositories/${this.repoSettings.id}/force_update/`, {
+                        const response = await fetch(`${this.api.baseUrl}/repositories/${this.repoSettings.id}/force_update/`, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
