@@ -85,6 +85,19 @@ class FeastDiagram {
         this.codeGen.setRepoSettings(this.repoSettings);
     }
 
+    // Delegation helpers — the original monolith had these on the class directly
+    addConnection(fromId, toId) {
+        return this.nodes.addConnection(fromId, toId);
+    }
+
+    generateDefaultColumnSecurity() {
+        return {
+            piiColumns: ['email', 'phone', 'ssn', 'address', 'name'],
+            maskedColumns: ['email', 'phone'],
+            restrictedColumns: ['ssn', 'salary']
+        };
+    }
+
     /**
      * Initialize repository settings from Django context or defaults
      * @private
@@ -858,7 +871,7 @@ class FeastDiagram {
             accessProcess: ds.access_process || '',
             x: ds.pos_x || 100,
             y: ds.pos_y || 100,
-            columnSecurity: ds.column_security || generateDefaultColumnSecurity()
+            columnSecurity: ds.column_security || this.generateDefaultColumnSecurity()
         });
     }
 
@@ -1072,18 +1085,23 @@ class FeastDiagram {
 
     showAddModal(type) {
         this.currentModalType = type;
-        // Implementation opens modal with form for new node
-        this.ui.toggleModal('component', true);
+        this.tempFeatures = [];
+        this.tempTags = [];
+        this.editingNode = null;
+        document.getElementById('deleteBtn').style.display = 'none';
+        this.openModal(type);
     }
 
     showEditModal(id) {
         const node = this.nodes.nodes.get(id);
         if (!node) return;
-        
+
         this.editingNode = id;
         this.currentModalType = node.type;
-        // Implementation opens modal with populated form
-        this.ui.toggleModal('component', true);
+        this.tempFeatures = node.features ? [...node.features] : [];
+        this.tempTags = node.tags ? [...node.tags] : [];
+        document.getElementById('deleteBtn').style.display = 'inline-flex';
+        this.openModal(node.type, node);
     }
 
     showSettings() {
@@ -1530,7 +1548,7 @@ class FeastDiagram {
                     
                     if (type === 'datasource') {
                         // Generate options from comprehensive database types
-                        const dbOptions = Object.entries(this.databaseTypes).map(([key, db]) => 
+                        const dbOptions = Object.entries(this.nodes.databaseTypes).map(([key, db]) => 
                             `<option value="${key}" ${existingNode?.kind === key ? 'selected' : ''}>${db.icon} ${db.name}</option>`
                         ).join('');
                         
@@ -1541,31 +1559,31 @@ class FeastDiagram {
                                     <select class="form-select" id="inputKind" onchange="diagram.updateDBTypeInfo()">
                                         <option value="">Select database...</option>
                                         <optgroup label="Relational">
-                                            ${Object.entries(this.databaseTypes).filter(([k,v]) => v.category === 'Relational').map(([k,v]) => `<option value="${k}" ${existingNode?.kind === k ? 'selected' : ''}>${v.icon} ${v.name}</option>`).join('')}
+                                            ${Object.entries(this.nodes.databaseTypes).filter(([k,v]) => v.category === 'Relational').map(([k,v]) => `<option value="${k}" ${existingNode?.kind === k ? 'selected' : ''}>${v.icon} ${v.name}</option>`).join('')}
                                         </optgroup>
                                         <optgroup label="NoSQL">
-                                            ${Object.entries(this.databaseTypes).filter(([k,v]) => v.category === 'NoSQL').map(([k,v]) => `<option value="${k}" ${existingNode?.kind === k ? 'selected' : ''}>${v.icon} ${v.name}</option>`).join('')}
+                                            ${Object.entries(this.nodes.databaseTypes).filter(([k,v]) => v.category === 'NoSQL').map(([k,v]) => `<option value="${k}" ${existingNode?.kind === k ? 'selected' : ''}>${v.icon} ${v.name}</option>`).join('')}
                                         </optgroup>
                                         <optgroup label="Cloud Warehouse">
-                                            ${Object.entries(this.databaseTypes).filter(([k,v]) => v.category === 'Cloud Warehouse').map(([k,v]) => `<option value="${k}" ${existingNode?.kind === k ? 'selected' : ''}>${v.icon} ${v.name}</option>`).join('')}
+                                            ${Object.entries(this.nodes.databaseTypes).filter(([k,v]) => v.category === 'Cloud Warehouse').map(([k,v]) => `<option value="${k}" ${existingNode?.kind === k ? 'selected' : ''}>${v.icon} ${v.name}</option>`).join('')}
                                         </optgroup>
                                         <optgroup label="Streaming">
-                                            ${Object.entries(this.databaseTypes).filter(([k,v]) => v.category === 'Streaming').map(([k,v]) => `<option value="${k}" ${existingNode?.kind === k ? 'selected' : ''}>${v.icon} ${v.name}</option>`).join('')}
+                                            ${Object.entries(this.nodes.databaseTypes).filter(([k,v]) => v.category === 'Streaming').map(([k,v]) => `<option value="${k}" ${existingNode?.kind === k ? 'selected' : ''}>${v.icon} ${v.name}</option>`).join('')}
                                         </optgroup>
                                         <optgroup label="Object Storage">
-                                            ${Object.entries(this.databaseTypes).filter(([k,v]) => v.category === 'Object Storage').map(([k,v]) => `<option value="${k}" ${existingNode?.kind === k ? 'selected' : ''}>${v.icon} ${v.name}</option>`).join('')}
+                                            ${Object.entries(this.nodes.databaseTypes).filter(([k,v]) => v.category === 'Object Storage').map(([k,v]) => `<option value="${k}" ${existingNode?.kind === k ? 'selected' : ''}>${v.icon} ${v.name}</option>`).join('')}
                                         </optgroup>
                                         <optgroup label="In-Memory">
-                                            ${Object.entries(this.databaseTypes).filter(([k,v]) => v.category === 'In-Memory').map(([k,v]) => `<option value="${k}" ${existingNode?.kind === k ? 'selected' : ''}>${v.icon} ${v.name}</option>`).join('')}
+                                            ${Object.entries(this.nodes.databaseTypes).filter(([k,v]) => v.category === 'In-Memory').map(([k,v]) => `<option value="${k}" ${existingNode?.kind === k ? 'selected' : ''}>${v.icon} ${v.name}</option>`).join('')}
                                         </optgroup>
                                         <optgroup label="Graph">
-                                            ${Object.entries(this.databaseTypes).filter(([k,v]) => v.category === 'Graph').map(([k,v]) => `<option value="${k}" ${existingNode?.kind === k ? 'selected' : ''}>${v.icon} ${v.name}</option>`).join('')}
+                                            ${Object.entries(this.nodes.databaseTypes).filter(([k,v]) => v.category === 'Graph').map(([k,v]) => `<option value="${k}" ${existingNode?.kind === k ? 'selected' : ''}>${v.icon} ${v.name}</option>`).join('')}
                                         </optgroup>
                                         <optgroup label="Time-Series">
-                                            ${Object.entries(this.databaseTypes).filter(([k,v]) => v.category === 'Time-Series').map(([k,v]) => `<option value="${k}" ${existingNode?.kind === k ? 'selected' : ''}>${v.icon} ${v.name}</option>`).join('')}
+                                            ${Object.entries(this.nodes.databaseTypes).filter(([k,v]) => v.category === 'Time-Series').map(([k,v]) => `<option value="${k}" ${existingNode?.kind === k ? 'selected' : ''}>${v.icon} ${v.name}</option>`).join('')}
                                         </optgroup>
                                         <optgroup label="Others">
-                                            ${Object.entries(this.databaseTypes).filter(([k,v]) => !['Relational', 'NoSQL', 'Cloud Warehouse', 'Streaming', 'Object Storage', 'In-Memory', 'Graph', 'Time-Series'].includes(v.category)).map(([k,v]) => `<option value="${k}" ${existingNode?.kind === k ? 'selected' : ''}>${v.icon} ${v.name}</option>`).join('')}
+                                            ${Object.entries(this.nodes.databaseTypes).filter(([k,v]) => !['Relational', 'NoSQL', 'Cloud Warehouse', 'Streaming', 'Object Storage', 'In-Memory', 'Graph', 'Time-Series'].includes(v.category)).map(([k,v]) => `<option value="${k}" ${existingNode?.kind === k ? 'selected' : ''}>${v.icon} ${v.name}</option>`).join('')}
                                         </optgroup>
                                     </select>
                                 </div>
@@ -1762,7 +1780,7 @@ class FeastDiagram {
                         if (node.type === 'datasource') {
                             const kind = document.getElementById('inputKind').value;
                             node.kind = kind;
-                            node.dbType = this.databaseTypes[kind];
+                            node.dbType = this.nodes.databaseTypes[kind];
                             node.details.connection = document.getElementById('inputConnection')?.value || '';
                             node.ownedBy = document.getElementById('inputOwnedBy')?.value || this.repoSettings.defaultOwner;
                             node.accessProcess = document.getElementById('inputAccessProcess')?.value || '';
@@ -2695,7 +2713,7 @@ class FeastDiagram {
 
     updateDBTypeInfo() {
                     const kind = document.getElementById('inputKind').value;
-                    const dbType = this.databaseTypes[kind];
+                    const dbType = this.nodes.databaseTypes[kind];
                     if (dbType) {
                         document.getElementById('dbTypeHint').textContent = `Default process: ${dbType.defaultProcess}`;
                     }
@@ -3458,8 +3476,8 @@ class FeastDiagram {
                 }
 
     addDatasource(config) {
-                    const id = `source_${++this.counters.datasource}`;
-                    const dbType = this.databaseTypes[config.kind] || { 
+                    const id = `source_${++this.nodes.counters.datasource}`;
+                    const dbType = this.nodes.databaseTypes[config.kind] || { 
                         name: config.kind, 
                         debezium: false,
                         defaultProcess: 'Contact data platform team',
@@ -3493,7 +3511,7 @@ class FeastDiagram {
                 }
 
     addEntity(config) {
-                    const id = `entity_${++this.counters.entity}`;
+                    const id = `entity_${++this.nodes.counters.entity}`;
                     const node = {
                         id,
                         type: 'entity',
@@ -3514,7 +3532,7 @@ class FeastDiagram {
                 }
 
     addFeatureView(config) {
-                    const id = `fv_${++this.counters.featureview}`;
+                    const id = `fv_${++this.nodes.counters.featureview}`;
                     const node = {
                         id,
                         type: 'featureview',
@@ -3546,7 +3564,7 @@ class FeastDiagram {
                 }
 
     addService(config) {
-                    const id = `service_${++this.counters.service}`;
+                    const id = `service_${++this.nodes.counters.service}`;
                     const node = {
                         id,
                         type: 'service',
