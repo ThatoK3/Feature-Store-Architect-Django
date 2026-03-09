@@ -1,43 +1,49 @@
 <div class="django-panel" id="djangoPanel">
-    <div class="django-header">
-        <div class="django-title">
-            <span>🎭</span>
-            <span>Django Admin</span>
-        </div>
-        <button class="btn btn-icon" onclick="diagram.toggleDjangoAdmin()">✕</button>
-    </div>
-    <div class="django-content">
-        <div class="django-section">
-            <div class="django-section-title">Access Control</div>
-            <div class="detail-card">
-                <div class="detail-row">
-                    <span class="detail-label">Current User</span>
-                    <span class="detail-value" id="djangoCurrentUser">John Doe</span>
+            <div class="django-header">
+                <div class="django-title">
+                    <span>🎭</span>
+                    <span>Django Admin</span>
                 </div>
-                <div class="detail-row">
-                    <span class="detail-label">Team</span>
-                    <span class="detail-value" id="djangoTeam">Data Engineering</span>
+                <button class="btn btn-icon" onclick="diagram.toggleDjangoAdmin()">✕</button>
+            </div>
+            <div class="django-content">
+                <div class="django-section">
+                    <div class="django-section-title">Access Control</div>
+                    <div class="detail-card">
+                        <div class="detail-row">
+                            <span class="detail-label">Current User</span>
+                            <span class="detail-value" id="djangoCurrentUser">John Doe</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Team</span>
+                            <span class="detail-value" id="djangoTeam">Data Engineering</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Role</span>
+                            <span class="detail-value" id="djangoRole">Feature Developer</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="detail-row">
-                    <span class="detail-label">Role</span>
-                    <span class="detail-value" id="djangoRole">Feature Developer</span>
+
+                <div class="django-section">
+                    <div class="django-section-title">Resource Permissions</div>
+                    <div id="djangoPermissions">
+                        <!-- Permissions will be populated here -->
+                    </div>
+                </div>
+
+                <div class="django-section">
+                    <div class="django-section-title">Recent Audit Log</div>
+                    <div id="djangoAuditLog">
+                        <!-- Audit log will be populated here -->
+                    </div>
+                </div>
+
+                <div class="django-section">
+                    <div class="django-section-title">Column Security</div>
+                    <div id="djangoColumnSecurity">
+                        <!-- Column security will be populated here -->
+                    </div>
                 </div>
             </div>
         </div>
-
-        <div class="django-section">
-            <div class="django-section-title">Resource Permissions</div>
-            <div id="djangoPermissions"></div>
-        </div>
-
-        <div class="django-section">
-            <div class="django-section-title">Recent Audit Log</div>
-            <div id="djangoAuditLog"></div>
-        </div>
-
-        <div class="django-section">
-            <div class="django-section-title">Column Security</div>
-            <div id="djangoColumnSecurity"></div>
-        </div>
-    </div>
-</div>

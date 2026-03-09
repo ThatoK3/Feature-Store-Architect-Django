@@ -1,47 +1,49 @@
 <div class="llm-panel" id="llmPanel">
-    <div class="llm-header">
-        <div class="llm-title">
-            <span>🤖</span>
-            <span>AI Assistant</span>
-        </div>
-        <button class="btn btn-icon" onclick="diagram.toggleLLMHelper()">✕</button>
-    </div>
-    <div class="llm-content">
-        <div class="llm-context">
-            <div class="llm-context-title">Current Context</div>
-            <div id="llmContextContent">
-                <div class="llm-context-item">
-                    <span>📊</span>
-                    <span>No node selected</span>
+            <div class="llm-header">
+                <div class="llm-title">
+                    <span>🤖</span>
+                    <span>AI Assistant</span>
+                </div>
+                <button class="btn btn-icon" onclick="diagram.toggleLLMHelper()">✕</button>
+            </div>
+            <div class="llm-content">
+                <div class="llm-context">
+                    <div class="llm-context-title">Current Context</div>
+                    <div id="llmContextContent">
+                        <div class="llm-context-item">
+                            <span>📊</span>
+                            <span>No node selected</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="llm-prompts">
+                    <button class="llm-prompt-btn" onclick="diagram.askLLM('generate_code')">
+                        <strong>Generate Feast Code</strong><br>
+                        <small>Create Python code for current architecture</small>
+                    </button>
+                    <button class="llm-prompt-btn" onclick="diagram.askLLM('optimize')">
+                        <strong>Suggest Optimizations</strong><br>
+                        <small>Improve feature view performance</small>
+                    </button>
+                    <button class="llm-prompt-btn" onclick="diagram.askLLM('lineage')">
+                        <strong>Explain Data Lineage</strong><br>
+                        <small>Trace data flow from source to service</small>
+                    </button>
+                    <button class="llm-prompt-btn" onclick="diagram.askLLM('validate')">
+                        <strong>Validate Relationships</strong><br>
+                        <small>Check entity and feature consistency</small>
+                    </button>
+                </div>
+
+                <div class="llm-chat">
+                    <div class="llm-messages" id="llmMessages">
+                        <!-- Messages will appear here -->
+                    </div>
+                    <div class="llm-input-area">
+                        <textarea class="llm-input" id="llmInput" placeholder="Ask anything about your feature store..." rows="1"></textarea>
+                        <button class="llm-send-btn" onclick="diagram.sendLLMMessage()">Send</button>
+                    </div>
                 </div>
             </div>
         </div>
-
-        <div class="llm-prompts">
-            <button class="llm-prompt-btn" onclick="diagram.askLLM('generate_code')">
-                <strong>Generate Feast Code</strong><br>
-                <small>Create Python code for current architecture</small>
-            </button>
-            <button class="llm-prompt-btn" onclick="diagram.askLLM('optimize')">
-                <strong>Suggest Optimizations</strong><br>
-                <small>Improve feature view performance</small>
-            </button>
-            <button class="llm-prompt-btn" onclick="diagram.askLLM('lineage')">
-                <strong>Explain Data Lineage</strong><br>
-                <small>Trace data flow from source to service</small>
-            </button>
-            <button class="llm-prompt-btn" onclick="diagram.askLLM('validate')">
-                <strong>Validate Relationships</strong><br>
-                <small>Check entity and feature consistency</small>
-            </button>
-        </div>
-
-        <div class="llm-chat">
-            <div class="llm-messages" id="llmMessages"></div>
-            <div class="llm-input-area">
-                <textarea class="llm-input" id="llmInput" placeholder="Ask anything about your feature store..." rows="1"></textarea>
-                <button class="llm-send-btn" onclick="diagram.sendLLMMessage()">Send</button>
-            </div>
-        </div>
-    </div>
-</div>

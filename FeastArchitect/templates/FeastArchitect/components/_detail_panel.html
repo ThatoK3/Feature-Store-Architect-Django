@@ -1,26 +1,26 @@
 <div class="side-panel" id="detailPanel">
-    <div class="panel-resize"></div>
-    <div class="panel-header">
-        <div class="panel-title-section">
-            <div class="panel-type-badge" id="panelBadge">
-                <span id="panelIcon">📊</span>
-                <span id="panelType">Feature View</span>
+            <div class="panel-resize"></div>
+            <div class="panel-header">
+                <div class="panel-title-section">
+                    <div class="panel-type-badge" id="panelBadge">
+                        <span id="panelIcon">📊</span>
+                        <span id="panelType">Feature View</span>
+                    </div>
+                    <div class="panel-title" id="panelTitle">Select a Component</div>
+                    <div class="panel-subtitle" id="panelSubtitle">Click on any node to view details</div>
+                    <div class="tags-container" id="panelTags"></div>
+                </div>
+                <div class="panel-actions">
+                    <button class="panel-action-btn" onclick="diagram.editSelected()" title="Edit">✏️</button>
+                    <button class="panel-action-btn delete" onclick="diagram.deleteSelected()" title="Delete">🗑️</button>
+                    <button class="panel-action-btn" onclick="diagram.closePanel()" title="Close">✕</button>
+                </div>
             </div>
-            <div class="panel-title" id="panelTitle">Select a Component</div>
-            <div class="panel-subtitle" id="panelSubtitle">Click on any node to view details</div>
-            <div class="tags-container" id="panelTags"></div>
+            <div class="panel-content" id="panelContent">
+                <div class="empty-state">
+                    <div class="empty-icon">📋</div>
+                    <div class="empty-title">No Selection</div>
+                    <p>Click on any component in the diagram to view its details, connections, and metadata.</p>
+                </div>
+            </div>
         </div>
-        <div class="panel-actions">
-            <button class="panel-action-btn" onclick="diagram.editSelected()" title="Edit">✏️</button>
-            <button class="panel-action-btn delete" onclick="diagram.deleteSelected()" title="Delete">🗑️</button>
-            <button class="panel-action-btn" onclick="diagram.closePanel()" title="Close">✕</button>
-        </div>
-    </div>
-    <div class="panel-content" id="panelContent">
-        <div class="empty-state">
-            <div class="empty-icon">📋</div>
-            <div class="empty-title">No Selection</div>
-            <p>Click on any component in the diagram to view its details, connections, and metadata.</p>
-        </div>
-    </div>
-</div>

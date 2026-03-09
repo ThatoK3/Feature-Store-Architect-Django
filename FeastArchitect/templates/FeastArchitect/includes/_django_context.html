@@ -1,15 +1,17 @@
+<!-- Passing Django context to JavaScript -->
 <script>
+    // Django template variables available to JavaScript
     window.DJANGO_CONTEXT = {
         repoId: {{ repo_id|default:"null" }},
         repoName: "{{ repo_name|default:''|escapejs }}",
         repoError: "{{ repo_error|default:''|escapejs }}",
-        apiBaseUrl: "{{ api_base_url }}",
+        apiBaseUrl: "{{ api_base_url|default:'/api' }}",
         user: {
-            id: {{ user.id }},
-            username: "{{ user.username|escapejs }}",
-            email: "{{ user.email|escapejs }}",
-            firstName: "{{ user.first_name|escapejs }}",
-            lastName: "{{ user.last_name|escapejs }}"
+            id: {{ user.id|default:"null" }},
+            username: "{{ user.username|default:''|escapejs }}",
+            email: "{{ user.email|default:''|escapejs }}",
+            firstName: "{{ user.first_name|default:''|escapejs }}",
+            lastName: "{{ user.last_name|default:''|escapejs }}"
         },
         csrfToken: "{{ csrf_token }}"
     };

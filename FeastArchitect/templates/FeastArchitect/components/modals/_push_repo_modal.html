@@ -1,18 +1,18 @@
 <div class="modal-overlay" id="pushRepoModal">
-    <div class="modal" style="max-width: 500px;">
-        <div class="modal-header">
-            <div class="modal-title" id="pushModalTitle">Push Repository</div>
-            <button class="modal-close" onclick="diagram.closePushModal()">×</button>
-        </div>
-        <div class="modal-body">
-            <div id="pushModalMessage"></div>
-            <div class="status-bar" style="margin-top: 20px;">
-                <div id="pushProgress" class="progress-bar" style="width: 0%; height: 4px; background: var(--feast-orange); transition: width 0.3s;"></div>
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <div class="modal-title" id="pushModalTitle">Push Repository</div>
+                <button class="modal-close" onclick="diagram.closePushModal()">×</button>
             </div>
-            <div id="pushStatus" style="margin-top: 12px; font-size: 13px; color: var(--text-secondary);"></div>
-        </div>
-        <div class="modal-footer">
-            <button class="btn" onclick="diagram.closePushModal()">Close</button>
+            <div class="modal-body">
+                <div id="pushModalMessage"></div>
+                <div class="status-bar" style="margin-top: 20px;">
+                    <div id="pushProgress" class="progress-bar" style="width: 0%; height: 4px; background: var(--feast-orange); transition: width 0.3s;"></div>
+                </div>
+                <div id="pushStatus" style="margin-top: 12px; font-size: 13px; color: var(--text-secondary);"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="diagram.closePushModal()">Close</button>
+            </div>
         </div>
     </div>
-</div>

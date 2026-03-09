@@ -1,41 +1,41 @@
 <div class="modal-overlay" id="userSelectorModal">
-    <div class="modal" style="max-width: 400px;">
-        <div class="modal-header">
-            <div class="modal-title">👤 Switch User Context</div>
-            <button class="modal-close" onclick="document.getElementById('userSelectorModal').classList.remove('active')">×</button>
-        </div>
-        <div class="modal-body">
-            <div class="form-group">
-                <label class="form-label">Select User</label>
-                <select class="form-select" id="userSelect" onchange="diagram.switchUser()">
-                    <option value="john">John Doe (Data Engineer)</option>
-                    <option value="jane">Jane Smith (Data Scientist)</option>
-                    <option value="bob">Bob Johnson (Platform Admin)</option>
-                    <option value="alice">Alice Chen (ML Engineer)</option>
-                </select>
+        <div class="modal" style="max-width: 400px;">
+            <div class="modal-header">
+                <div class="modal-title">👤 Switch User Context</div>
+                <button class="modal-close" onclick="document.getElementById('userSelectorModal').classList.remove('active')">×</button>
             </div>
-            <div class="form-group">
-                <label class="form-label">Team</label>
-                <select class="form-select" id="teamSelect">
-                    <option>Data Engineering</option>
-                    <option>Machine Learning</option>
-                    <option>Platform</option>
-                    <option>Analytics</option>
-                </select>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Select User</label>
+                    <select class="form-select" id="userSelect" onchange="diagram.switchUser()">
+                        <option value="john">John Doe (Data Engineer)</option>
+                        <option value="jane">Jane Smith (Data Scientist)</option>
+                        <option value="bob">Bob Johnson (Platform Admin)</option>
+                        <option value="alice">Alice Chen (ML Engineer)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Team</label>
+                    <select class="form-select" id="teamSelect">
+                        <option>Data Engineering</option>
+                        <option>Machine Learning</option>
+                        <option>Platform</option>
+                        <option>Analytics</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Role</label>
+                    <select class="form-select" id="roleSelect">
+                        <option>Feature Developer</option>
+                        <option>Feature Consumer</option>
+                        <option>Admin</option>
+                        <option>Viewer</option>
+                    </select>
+                </div>
             </div>
-            <div class="form-group">
-                <label class="form-label">Role</label>
-                <select class="form-select" id="roleSelect">
-                    <option>Feature Developer</option>
-                    <option>Feature Consumer</option>
-                    <option>Admin</option>
-                    <option>Viewer</option>
-                </select>
+            <div class="modal-footer">
+                <button class="btn" onclick="document.getElementById('userSelectorModal').classList.remove('active')">Cancel</button>
+                <button class="btn btn-primary" onclick="diagram.applyUserContext()">Apply Context</button>
             </div>
-        </div>
-        <div class="modal-footer">
-            <button class="btn" onclick="document.getElementById('userSelectorModal').classList.remove('active')">Cancel</button>
-            <button class="btn btn-primary" onclick="diagram.applyUserContext()">Apply Context</button>
         </div>
     </div>
-</div>
