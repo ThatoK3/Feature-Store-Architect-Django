@@ -5865,13 +5865,11 @@ the registry, online store, and offline store settings.
 
         document.getElementById('fdmEditMode').style.display = 'none';
         document.getElementById('fdmViewMode').style.display = '';
+        document.getElementById('fdmEditBtnIcon').textContent = '✏️';
+        document.getElementById('fdmEditBtnLabel').textContent = 'Edit';
+        document.getElementById('fdmEditBtn').classList.remove('active');
 
-
-	document.getElementById('fdmEditBtnIcon').textContent = '✏️';
-	document.getElementById('fdmEditBtnLabel').textContent = 'Edit';
- 	document.getElementById('fdmEditBtn').classList.remove('active');
-        
-	document.getElementById('featureDetailModal').classList.add('active');
+        document.getElementById('featureDetailModal').classList.add('active');
     }
 
     _closeFeatureModal() {
@@ -6010,14 +6008,17 @@ the registry, online store, and offline store settings.
         const viewMode = document.getElementById('fdmViewMode');
         const editMode = document.getElementById('fdmEditMode');
         const btn = document.getElementById('fdmEditBtn');
+        const btnIcon = document.getElementById('fdmEditBtnIcon');
+        const btnLabel = document.getElementById('fdmEditBtnLabel');
+        if (!viewMode || !editMode || !btn) return;
         const isEditing = editMode.style.display !== 'none';
 
         if (isEditing) {
             editMode.style.display = 'none';
             viewMode.style.display = '';
             btn.classList.remove('active');
-            document.getElementById('fdmEditBtnIcon').textContent = '✏️';
-            document.getElementById('fdmEditBtnLabel').textContent = 'Edit';
+            if (btnIcon) btnIcon.textContent = '✏️';
+            if (btnLabel) btnLabel.textContent = 'Edit';
         } else {
             if (!this._fdmContext) return;
             const node = this.nodes.nodes.get(this._fdmContext.nodeId);
@@ -6028,8 +6029,8 @@ the registry, online store, and offline store settings.
             editMode.style.display = 'flex';
             editMode.style.flexDirection = 'column';
             btn.classList.add('active');
-            document.getElementById('fdmEditBtnIcon').textContent = '👁';
-            document.getElementById('fdmEditBtnLabel').textContent = 'View';
+            if (btnIcon) btnIcon.textContent = '👁';
+            if (btnLabel) btnLabel.textContent = 'View';
         }
     }
 
