@@ -1150,23 +1150,21 @@
         .stats-bar {
             position: absolute;
             bottom: 24px;
-            left: 35%;
-            right: 24px; 
-            max-width: 550px; 
-            display: flex;
-            gap: 16px;
-            padding: 12px 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: inline-flex;
+            gap: 4px;
+            padding: 8px 12px;
             background: var(--bg-secondary);
             border: 1px solid var(--border-color);
             border-radius: 12px;
             box-shadow: var(--shadow-lg);
-            cursor: pointer;
-            transition: all 0.2s;
+            transition: box-shadow 0.2s;
             z-index: 100;
+            white-space: nowrap;
         }
 
         .stats-bar:hover {
-            transform: translateY(-2px);
             box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
         }
 
