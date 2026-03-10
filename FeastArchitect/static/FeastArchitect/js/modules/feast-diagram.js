@@ -3721,7 +3721,7 @@ class FeastDiagram {
             if (stats[node.type] !== undefined) {
                 stats[node.type]++;
             }
-            if (node.features && Array.isArray(node.features)) {
+            if (node.type === 'featureview' && node.features && Array.isArray(node.features)) {
                 stats.features += node.features.length;
             }
         });
@@ -3767,7 +3767,7 @@ class FeastDiagram {
         const featuresDiv = document.getElementById('tooltipFeatures');
         const featureList = document.getElementById('tooltipFeatureList');
         
-        if (node.features && node.features.length > 0) {
+        if (node.type === 'featureview' && node.features && node.features.length > 0) {
             featuresDiv.style.display = 'block';
             // Update title with count
             const titleEl = document.getElementById('tooltipFeaturesTitle');
