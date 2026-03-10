@@ -2112,8 +2112,8 @@
 
         .notification {
             position: fixed;
-            top: 80px;
-            right: 24px;
+            bottom: 32px;
+            left: 24px;
             background: var(--bg-secondary);
             border: 1px solid var(--border-color);
             border-radius: 12px;
@@ -2123,7 +2123,7 @@
             align-items: center;
             gap: 12px;
             z-index: 10000;
-            transform: translateX(400px);
+            transform: translateX(-400px);
             transition: transform 0.3s;
         }
 
