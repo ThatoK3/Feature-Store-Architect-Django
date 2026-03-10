@@ -30,6 +30,19 @@ class FeastDiagram {
         // Initialize all sub-modules
         this.initializeModules();
         
+        // Proxy canvas state to renderer so legacy this.ctx / this.scale etc. work
+        const r = this.renderer;
+        Object.defineProperties(this, {
+            ctx:           { get() { return r.ctx; }, set(v) { r.ctx = v; } },
+            scale:         { get() { return r.scale; }, set(v) { r.scale = v; } },
+            offsetX:       { get() { return r.offsetX; }, set(v) { r.offsetX = v; } },
+            offsetY:       { get() { return r.offsetY; }, set(v) { r.offsetY = v; } },
+            width:         { get() { return r.width; }, set(v) { r.width = v; } },
+            height:        { get() { return r.height; }, set(v) { r.height = v; } },
+            miniMapCtx:    { get() { return r.miniMapCtx; }, set(v) { r.miniMapCtx = v; } },
+            miniMapCanvas: { get() { return r.miniMapCanvas; }, set(v) { r.miniMapCanvas = v; } },
+        });
+        
         // Application state
         this.selectedNode = null;
         this.hoveredNode = null;
