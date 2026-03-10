@@ -2,36 +2,36 @@
             <div class="grid-background"></div>
             <canvas id="diagramCanvas"></canvas>
             
-            <div class="stats-bar" id="statsBar" onclick="diagram.showStatsModal()">
-                <div class="stat-item">
+            <div class="stats-bar" id="statsBar">
+                <div class="stat-item" onclick="diagram.showNodesByType('datasource')" title="Show all Data Sources">
                     <div class="stat-icon" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa;">🗄️</div>
                     <div class="stat-content">
                         <div class="stat-value" id="statSources">0</div>
                         <div class="stat-label">Sources</div>
                     </div>
                 </div>
-                <div class="stat-item">
-                    <div class="stat-icon" style="background: rgba(139, 92, 246, 0.2); color: #a78bfa;">👤</div>
+                <div class="stat-item" onclick="diagram.showNodesByType('entity')" title="Show all Entities">
+                    <div class="stat-icon" style="background: rgba(139, 92, 246, 0.2); color: #a78bfa;">🔑</div>
                     <div class="stat-content">
                         <div class="stat-value" id="statEntities">0</div>
                         <div class="stat-label">Entities</div>
                     </div>
                 </div>
-                <div class="stat-item">
+                <div class="stat-item" onclick="diagram.showNodesByType('featureview')" title="Show all Feature Views">
                     <div class="stat-icon" style="background: rgba(16, 185, 129, 0.2); color: #34d399;">📊</div>
                     <div class="stat-content">
                         <div class="stat-value" id="statViews">0</div>
                         <div class="stat-label">Views</div>
                     </div>
                 </div>
-                <div class="stat-item">
-                    <div class="stat-icon" style="background: rgba(249, 115, 22, 0.2); color: #fb923c;">🚀</div>
+                <div class="stat-item" onclick="diagram.showNodesByType('service')" title="Show all Feature Services">
+                    <div class="stat-icon" style="background: rgba(249, 115, 22, 0.2); color: #fb923c;">⚙️</div>
                     <div class="stat-content">
                         <div class="stat-value" id="statServices">0</div>
                         <div class="stat-label">Services</div>
                     </div>
                 </div>
-                <div class="stat-item">
+                <div class="stat-item" onclick="diagram.showFeatureBrowser()" title="Show all Features">
                     <div class="stat-icon" style="background: rgba(6, 182, 212, 0.2); color: #22d3ee;">⚡</div>
                     <div class="stat-content">
                         <div class="stat-value" id="statFeatures">0</div>
