@@ -233,7 +233,7 @@ function loadComplexExample(nodeManager, addConnection, autoLayout) {
                 tags: ['demographic', 'pii'],
                 owner: 'Platform Team',
                 sourceColumn: 'birth_date',
-                transformation: 'EXTRACT(YEAR FROM AGE(CURRENT_DATE, birth_date))',
+                transformation: "EXTRACT(YEAR FROM AGE(CURRENT_DATE, birth_date))",
                 defaultValue: '0',
                 validation: { min: 0, max: 150, nullable: false },
                 serving: { online: true, offline: true, ttl: 86400 },
@@ -284,13 +284,46 @@ function loadComplexExample(nodeManager, addConnection, autoLayout) {
         entities: [user],
         tags: ['financial', 'sensitive', 'batch'],
         features: [
-            { name: 'total_lifetime_spend', type: 'Float32' },
-            { name: 'order_count_30d', type: 'Int64' },
-            { name: 'avg_order_value', type: 'Float32' },
-            { name: 'favorite_category', type: 'String' },
-            { name: 'days_since_last_order', type: 'Int64' },
-            { name: 'refund_rate', type: 'Float32' },
-            { name: 'payment_methods_used', type: 'Int64' }
+            {
+                name: 'total_lifetime_spend', type: 'Float32',
+                description: 'Cumulative spend across all orders since account creation',
+                tags: ['financial', 'sensitive'],
+                owner: 'Finance Team',
+                sourceColumn: 'order_total',
+                transformation: "SUM(order_total) FILTER (WHERE status = 'completed')",
+                serving: { online: true, offline: true, ttl: 3600 },
+                security: { pii: false, sensitive: true, classification: 'confidential' },
+                quality: { freshness: 'hourly', completeness: 99.2, accuracy: 99.8 },
+                statistics: { mean: 847.30, stdDev: 1203.50, nullCount: 45, distinctCount: 98231 }
+            },
+            {
+                name: 'order_count_30d', type: 'Int64',
+                description: 'Number of completed orders in last 30 days',
+                tags: ['engagement', 'recency'],
+                owner: 'Finance Team',
+                sourceColumn: 'order_id',
+                transformation: "COUNT(order_id) FILTER (WHERE created_at > NOW() - INTERVAL '30 days')",
+                validation: { min: 0, nullable: false },
+                serving: { online: true, offline: true, ttl: 3600 },
+                security: { pii: false, classification: 'internal' },
+                quality: { freshness: 'hourly', completeness: 100, accuracy: 99.99 },
+                statistics: { mean: 3.2, stdDev: 5.1, nullCount: 0, distinctCount: 28 }
+            },
+            {
+                name: 'avg_order_value', type: 'Float32',
+                description: 'Average order value over all completed orders',
+                tags: ['financial'],
+                owner: 'Finance Team',
+                transformation: "AVG(order_total) FILTER (WHERE status = 'completed')",
+                serving: { online: true, offline: true, ttl: 3600 },
+                security: { pii: false, sensitive: true, classification: 'confidential' },
+                quality: { freshness: 'hourly', completeness: 97.5, accuracy: 99.5 },
+                statistics: { mean: 112.40, stdDev: 89.20, nullCount: 1203, distinctCount: 8734 }
+            },
+            { name: 'favorite_category', type: 'String', description: 'Most purchased product category', serving: { online: true, offline: false }, security: { classification: 'internal' } },
+            { name: 'days_since_last_order', type: 'Int64', description: 'Days elapsed since most recent completed order', serving: { online: true, offline: true }, statistics: { mean: 18.4, nullCount: 233 } },
+            { name: 'refund_rate', type: 'Float32', description: 'Proportion of orders that were refunded', tags: ['risk'], serving: { online: false, offline: true }, quality: { freshness: 'daily', completeness: 95.0 } },
+            { name: 'payment_methods_used', type: 'Int64', description: 'Count of distinct payment methods used', serving: { online: true, offline: true } }
         ],
         details: {
             ttl: '86400',

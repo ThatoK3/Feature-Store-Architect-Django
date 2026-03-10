@@ -1,6 +1,23 @@
 <div class="side-panel" id="detailPanel">
             <div class="panel-resize"></div>
-            <div class="panel-header">
+
+            <!-- Feature Catalog Browser Header -->
+            <div class="panel-header panel-fb-header" id="panelFbHeader" style="display:none">
+                <div class="panel-title-section">
+                    <div class="panel-type-badge" style="background:rgba(16,185,129,0.1)">
+                        <span>⚡</span>
+                        <span style="color:var(--feast-green)">Feature Catalog</span>
+                    </div>
+                    <div class="panel-title" id="panelFbCount">All Features</div>
+                    <div class="panel-subtitle">Browse, search and edit features across all Feature Views</div>
+                </div>
+                <div class="panel-actions">
+                    <button class="panel-action-btn" onclick="diagram.closePanel()" title="Close">✕</button>
+                </div>
+            </div>
+
+            <!-- Node Panel Header -->
+            <div class="panel-header" id="panelNodeHeader">
                 <div class="panel-title-section">
                     <div class="panel-type-badge" id="panelBadge">
                         <span id="panelIcon">📊</span>
@@ -11,11 +28,15 @@
                     <div class="tags-container" id="panelTags"></div>
                 </div>
                 <div class="panel-actions">
+                    <button class="panel-action-btn catalog-btn" id="panelFeatCatalogBtn"
+                        onclick="diagram.showFeatureBrowser()" title="Browse all features"
+                        style="display:none">⚡ All Features</button>
                     <button class="panel-action-btn" onclick="diagram.editSelected()" title="Edit">✏️</button>
                     <button class="panel-action-btn delete" onclick="diagram.deleteSelected()" title="Delete">🗑️</button>
                     <button class="panel-action-btn" onclick="diagram.closePanel()" title="Close">✕</button>
                 </div>
             </div>
+
             <div class="panel-content" id="panelContent">
                 <div class="empty-state">
                     <div class="empty-icon">📋</div>

@@ -908,8 +908,11 @@ class FeastDiagram {
      */
     closePanel() {
         const panel = document.getElementById('detailPanel');
-        panel.classList.remove('open');
-        panel.classList.remove('wide');
+        panel.classList.remove('open', 'wide', 'fb-mode');
+        const fbH = document.getElementById('panelFbHeader');
+        const nodeH = document.getElementById('panelNodeHeader');
+        if (fbH) fbH.style.display = 'none';
+        if (nodeH) nodeH.style.display = '';
         this.selectedNode = null;
         this.render();
     }
@@ -1150,11 +1153,8 @@ class FeastDiagram {
             this.ui.showNotification('Loaded', `Repository "${data.name}" loaded`);
             
             setTimeout(() => this.animateFit(), 500);
-            // Auto-open the first featureview node on load
-            setTimeout(() => {
-                const firstFV = Array.from(this.nodes.nodes.values()).find(n => n.type === 'featureview');
-                if (firstFV) this.selectNode(firstFV.id);
-            }, 700);
+            // Auto-open the All Features browser on load
+            setTimeout(() => this.showFeatureBrowser(), 700);
             
         } catch (error) {
             console.error('Failed to load from backend:', error);
@@ -1705,6 +1705,7 @@ class FeastDiagram {
         tagsContainer.innerHTML = (node.tags && node.tags.length > 0)
             ? node.tags.map(t => `<span class="tag">#${t}</span>`).join('') : '';
 
+        this._setupPanelForNode(node);
         const contentEl = document.getElementById('panelContent');
         panel.classList.add('wide');
         contentEl.innerHTML = `
@@ -6222,6 +6223,238 @@ the registry, online store, and offline store settings.
 
     _hideFeatPopover() {
         document.getElementById('featHoverPopover')?.classList.remove('visible');
+    }
+
+    // ===================================================
+    // GLOBAL FEATURE BROWSER
+    // ===================================================
+
+    showFeatureBrowser() {
+        const panel = document.getElementById('detailPanel');
+        const contentEl = document.getElementById('panelContent');
+
+        // Switch headers
+        document.getElementById('panelFbHeader').style.display = '';
+        document.getElementById('panelNodeHeader').style.display = 'none';
+
+        // Gather ALL features from ALL feature views
+        const allFeatures = [];
+        this.nodes.nodes.forEach((node, nodeId) => {
+            if (node.type === 'featureview' && node.features) {
+                node.features.forEach((f, idx) => {
+                    allFeatures.push({ f, idx, nodeId, nodeName: node.name, nodeSubtype: node.subtype });
+                });
+            }
+        });
+
+        // Update count
+        document.getElementById('panelFbCount').textContent = `${allFeatures.length} Features`;
+
+        // Gather filter options
+        const types = [...new Set(allFeatures.map(e => (typeof e.f === 'object' ? e.f.type : '')).filter(Boolean))].sort();
+        const owners = [...new Set(allFeatures.map(e => e.f && e.f.owner).filter(Boolean))].sort();
+        const hasPii = allFeatures.some(e => e.f && e.f.security && e.f.security.pii);
+
+        const typePills = types.map(t =>
+            `<span class="fb-pill" data-filter="type" data-val="${t}">${t}</span>`
+        ).join('');
+
+        const ownerPills = owners.slice(0, 5).map(o =>
+            `<span class="fb-pill" data-filter="owner" data-val="${o}">${o}</span>`
+        ).join('');
+
+        const piiPill = hasPii ? `<span class="fb-pill fb-pill-pii" data-filter="pii" data-val="true">🔒 PII</span>` : '';
+        const onlinePill = `<span class="fb-pill" data-filter="serving" data-val="online">⚡ Online</span>`;
+        const offlinePill = `<span class="fb-pill" data-filter="serving" data-val="offline">💾 Offline</span>`;
+
+        // Full-width browser mode (no left/right split)
+        panel.classList.remove('wide');
+        panel.classList.add('fb-mode', 'open');
+
+        const listHtml = allFeatures.length > 0
+            ? allFeatures.map(e => this._buildRichFeatureCard(e.f, e.idx, e.nodeId, e.nodeName, e.nodeSubtype)).join('')
+            : `<div class="fb-empty"><div class="fb-empty-icon">⚡</div><div class="fb-empty-msg">No features defined yet. Add features to Feature Views to see them here.</div></div>`;
+
+        contentEl.innerHTML = `<div class="fb-layout">
+            <div class="fb-search-bar">
+                <div class="fb-search-wrap">
+                    <span class="fb-search-icon">⌕</span>
+                    <input class="fb-search-input" id="fbSearchInput"
+                        placeholder="Search by name, type, tag, owner, transformation…"
+                        oninput="diagram._fbFilter()">
+                </div>
+                <div class="fb-stats" id="fbStats">${allFeatures.length} features</div>
+            </div>
+            <div class="fb-filter-row" id="fbFilters">
+                <span class="fb-pill fb-pill-all active" data-filter="all">All</span>
+                ${typePills}
+                ${ownerPills}
+                ${piiPill}
+                ${onlinePill}
+                ${offlinePill}
+            </div>
+            <div class="fb-list" id="fbList">${listHtml}</div>
+        </div>`;
+
+        this._fbBindFilters();
+    }
+
+    _buildRichFeatureCard(f, idx, nodeId, nodeName, nodeSubtype) {
+        const isString = typeof f === 'string';
+        const name = isString ? f : (f.name || '');
+        const type = isString ? '' : (f.type || '');
+        const desc = f.description || '';
+        const tags = f.tags || [];
+        const owner = f.owner || '';
+        const pii = f.security && f.security.pii;
+        const classification = f.security && f.security.classification;
+        const onlineServing = f.serving && f.serving.online;
+        const offlineServing = f.serving && f.serving.offline;
+        const ttl = f.serving && f.serving.ttl;
+        const completeness = f.quality && f.quality.completeness;
+        const freshness = f.quality && f.quality.freshness;
+        const mean = f.statistics && f.statistics.mean;
+        const nullCount = f.statistics && f.statistics.nullCount;
+        const distinctCount = f.statistics && f.statistics.distinctCount;
+        const transformation = f.transformation || '';
+        const sourceColumn = f.sourceColumn || '';
+        const defaultValue = f.defaultValue;
+
+        const typeColors = {
+            'Int64':'#60a5fa','Int32':'#60a5fa','Int16':'#60a5fa','Int8':'#60a5fa',
+            'Float32':'#f59e0b','Float64':'#f59e0b',
+            'String':'#a78bfa','Bool':'#34d399','Bytes':'#fb923c','UnixTimestamp':'#f472b6'
+        };
+        const typeColor = typeColors[type] || '#64748b';
+
+        // Quality color
+        const qColor = completeness == null ? '#64748b'
+            : completeness >= 95 ? '#10b981'
+            : completeness >= 80 ? '#f59e0b' : '#f87171';
+
+        // Build inline metadata chips
+        let chips = `<span class="rfc-type-chip" style="color:${typeColor};border-color:${typeColor}40;background:${typeColor}12">${type}</span>`;
+        if (pii) chips += `<span class="rfc-chip rfc-chip-pii">🔒 PII</span>`;
+        if (onlineServing) chips += `<span class="rfc-chip rfc-chip-online">⚡ online</span>`;
+        if (offlineServing) chips += `<span class="rfc-chip rfc-chip-offline">💾 offline</span>`;
+        if (classification) chips += `<span class="rfc-chip rfc-chip-class">${classification}</span>`;
+
+        // Data quality indicator
+        const qualityIndicator = completeness != null
+            ? `<div class="rfc-quality" title="Completeness: ${completeness}%">
+                <div class="rfc-quality-label">${completeness}%</div>
+                <div class="rfc-quality-bar">
+                    <div class="rfc-quality-fill" style="width:${completeness}%;background:${qColor}"></div>
+                </div>
+               </div>` : '';
+
+        // Stats pills
+        let statChips = '';
+        if (mean != null) statChips += `<span class="rfc-stat">μ ${mean}</span>`;
+        if (distinctCount != null) statChips += `<span class="rfc-stat">${distinctCount.toLocaleString()} distinct</span>`;
+        if (nullCount != null && nullCount > 0) statChips += `<span class="rfc-stat rfc-stat-warn">${nullCount.toLocaleString()} nulls</span>`;
+
+        // Metadata rows (visible without hover)
+        let metaRows = '';
+        if (sourceColumn) metaRows += `<div class="rfc-meta-row"><span class="rfc-meta-k">Source</span><span class="rfc-meta-v">${sourceColumn}</span></div>`;
+        if (owner) metaRows += `<div class="rfc-meta-row"><span class="rfc-meta-k">Owner</span><span class="rfc-meta-v">${owner}</span></div>`;
+        if (ttl != null) metaRows += `<div class="rfc-meta-row"><span class="rfc-meta-k">TTL</span><span class="rfc-meta-v">${ttl}s</span></div>`;
+        if (freshness) metaRows += `<div class="rfc-meta-row"><span class="rfc-meta-k">Freshness</span><span class="rfc-meta-v">${freshness}</span></div>`;
+        if (defaultValue !== undefined) metaRows += `<div class="rfc-meta-row"><span class="rfc-meta-k">Default</span><span class="rfc-meta-v">${defaultValue}</span></div>`;
+
+        return `<div class="rfc"
+                    data-nodeid="${nodeId}" data-idx="${idx}"
+                    data-name="${name.toLowerCase()}" data-type="${type}"
+                    data-owner="${owner.toLowerCase()}" data-pii="${pii ? 'true' : ''}"
+                    data-online="${onlineServing ? 'true' : ''}"
+                    data-tags="${tags.join(',').toLowerCase()}"
+                    onmouseenter="diagram._showFbPopover('${nodeId}', ${idx}, this)"
+                    onmouseleave="diagram._hideFeatPopover()"
+                    onclick="diagram._openFeatureModal('${nodeId}', ${idx})">
+            <div class="rfc-main">
+                <div class="rfc-header">
+                    <div class="rfc-dot" style="background:${typeColor}"></div>
+                    <div class="rfc-name">${name}</div>
+                    <div class="rfc-chips">${chips}</div>
+                    <div class="rfc-source-tag">${nodeName}</div>
+                    <div class="rfc-edit-hint">Click to edit →</div>
+                </div>
+                ${desc ? `<div class="rfc-desc">${desc}</div>` : ''}
+                ${transformation ? `<div class="rfc-transform">${transformation.length > 90 ? transformation.slice(0,90)+'…' : transformation}</div>` : ''}
+                ${metaRows ? `<div class="rfc-meta">${metaRows}</div>` : ''}
+                ${statChips ? `<div class="rfc-stats">${statChips}</div>` : ''}
+                ${tags.length > 0 ? `<div class="rfc-tags">${tags.map(t=>`<span class="rfc-tag">#${t}</span>`).join('')}</div>` : ''}
+            </div>
+            ${qualityIndicator}
+        </div>`;
+    }
+
+    _fbBindFilters() {
+        const filters = document.getElementById('fbFilters');
+        if (!filters) return;
+        filters.addEventListener('click', e => {
+            const pill = e.target.closest('.fb-pill');
+            if (!pill) return;
+            // Toggle active
+            if (pill.dataset.filter === 'all') {
+                filters.querySelectorAll('.fb-pill').forEach(p => p.classList.remove('active'));
+                pill.classList.add('active');
+            } else {
+                filters.querySelector('.fb-pill-all')?.classList.remove('active');
+                pill.classList.toggle('active');
+            }
+            this._fbFilter();
+        });
+    }
+
+    _fbFilter() {
+        const q = (document.getElementById('fbSearchInput')?.value || '').toLowerCase();
+        const activeFilters = [...document.querySelectorAll('#fbFilters .fb-pill.active')]
+            .filter(p => p.dataset.filter !== 'all')
+            .map(p => ({ filter: p.dataset.filter, val: p.dataset.val }));
+        const allActive = document.querySelector('#fbFilters .fb-pill-all.active') != null || activeFilters.length === 0;
+
+        let visible = 0;
+        document.querySelectorAll('#fbList .rfc').forEach(card => {
+            // Text search
+            const textMatch = !q || card.dataset.name.includes(q) ||
+                card.dataset.type.toLowerCase().includes(q) ||
+                card.dataset.owner.includes(q) ||
+                card.dataset.tags.includes(q);
+
+            // Filter match
+            let filterMatch = allActive;
+            if (!filterMatch) {
+                filterMatch = activeFilters.every(({ filter, val }) => {
+                    if (filter === 'type') return card.dataset.type === val;
+                    if (filter === 'owner') return card.dataset.owner === val.toLowerCase();
+                    if (filter === 'pii') return card.dataset.pii === 'true';
+                    if (filter === 'serving') return card.dataset.online === 'true';
+                    return true;
+                });
+            }
+
+            const show = textMatch && filterMatch;
+            card.style.display = show ? '' : 'none';
+            if (show) visible++;
+        });
+
+        const stats = document.getElementById('fbStats');
+        if (stats) stats.textContent = `${visible} features`;
+    }
+
+    _showFbPopover(nodeId, idx, el) {
+        // Same as _showFeatPopover but always appears to LEFT of panel
+        this._showFeatPopover(nodeId, idx, el);
+    }
+
+    // Override showPanel to always show the ⚡ catalog button in node view
+    _setupPanelForNode(node) {
+        document.getElementById('panelFbHeader').style.display = 'none';
+        document.getElementById('panelNodeHeader').style.display = '';
+        // Show feature catalog button for any node
+        const btn = document.getElementById('panelFeatCatalogBtn');
+        if (btn) btn.style.display = '';
     }
 
 // Make globally available for HTML onclick handlers
