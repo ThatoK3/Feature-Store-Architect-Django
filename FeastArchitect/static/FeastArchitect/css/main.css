@@ -3788,6 +3788,14 @@
             min-height: 0;
         }
 
+        #fdmEditMode {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+            min-height: 0;
+        }
+
         .fdm-empty {
             color: var(--text-muted);
             font-size: 13px;
