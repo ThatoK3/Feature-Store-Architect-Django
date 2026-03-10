@@ -659,13 +659,11 @@ class FeastDiagram {
         
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
-                this.closePanel();
-                this.closeModal();
-                document.getElementById('settingsModal').classList.remove('active');
-                document.getElementById('statsModal').classList.remove('active');
-                document.getElementById('usageModal').classList.remove('active');
-                document.getElementById('searchDropdown').classList.remove('active');
-                document.getElementById('dataFlowModal').classList.remove('active');
+                const featModal = document.getElementById('featureDetailModal');
+                if (featModal && featModal.classList.contains('active')) {
+                    this._closeFeatureModal();
+                    return;
+                }
             }
             if (e.key === 'Delete' && this.selectedNode) {
                 this.deleteSelected();
@@ -1695,36 +1693,153 @@ class FeastDiagram {
 
         let subtitle = '';
         if (node.type === 'featureview') subtitle = `${node.subtype} • ${node.features.length} features`;
-        else if (node.type === 'service') subtitle = `${(node.features.length + (node.featureServices ? node.featureServices.length : 0))} dependencies`;
+        else if (node.type === 'service') {
+            const total = node.features.length + (node.featureServices ? node.featureServices.length : 0);
+            subtitle = `${total} dependencies`;
+        }
         else if (node.type === 'entity') subtitle = `Join key: ${node.joinKey}`;
         else if (node.type === 'datasource') subtitle = `${node.dbType ? node.dbType.name : node.kind} • ${node.ownedBy}`;
         document.getElementById('panelSubtitle').textContent = subtitle;
 
         const tagsContainer = document.getElementById('panelTags');
         tagsContainer.innerHTML = (node.tags && node.tags.length > 0)
-            ? node.tags.map(t => `<span class="tag">#${t}</span>`).join('')
-            : '';
+            ? node.tags.map(t => `<span class="tag">#${t}</span>`).join('') : '';
 
         const contentEl = document.getElementById('panelContent');
+        panel.classList.add('wide');
+        contentEl.innerHTML = `
+            <div class="panel-wide-layout">
+                <div class="panel-left-col" id="panelLeftCol"></div>
+                <div class="panel-right-col" id="panelRightCol"></div>
+            </div>`;
 
-        // Wide mode for featureviews with features
-        const isWide = node.type === 'featureview' && node.features && node.features.length > 0;
-        panel.classList.toggle('wide', isWide);
+        document.getElementById('panelLeftCol').innerHTML = this._buildNodeDetails(id, node, config, icon);
 
-        if (isWide) {
-            contentEl.innerHTML = `
-                <div class="panel-wide-layout">
-                    <div class="panel-left-col" id="panelLeftCol"></div>
-                    <div class="panel-right-col" id="panelRightCol"></div>
-                </div>`;
-            document.getElementById('panelLeftCol').innerHTML = this._buildNodeDetails(id, node, config, icon);
-            document.getElementById('panelRightCol').innerHTML = this._buildFeatureExplorer(node);
-            this._bindFeatureExplorer(node);
+        // Right column: always show features for FV/FS; schema for datasource; relationships for entity
+        const rightEl = document.getElementById('panelRightCol');
+        if (node.type === 'featureview' || (node.type === 'service' && node.features && node.features.length > 0)) {
+            rightEl.innerHTML = this._buildFeatureExplorer(node, id);
+            this._bindFeatureExplorer(node, id);
+        } else if (node.type === 'datasource') {
+            rightEl.innerHTML = this._buildDatasourceRight(node, id);
+        } else if (node.type === 'entity') {
+            rightEl.innerHTML = this._buildEntityRight(node, id);
         } else {
-            contentEl.innerHTML = this._buildNodeDetails(id, node, config, icon);
+            rightEl.innerHTML = `<div class="panel-right-empty">
+                <div class="panel-right-empty-icon">${icon}</div>
+                <div class="panel-right-empty-msg">No additional details</div>
+            </div>`;
         }
 
         panel.classList.add('open');
+    }
+
+    _buildDatasourceRight(node, nodeId) {
+        const cols = node.columns || node.schema || [];
+        const tableTitle = cols.length > 0 ? `Schema <span class="feat-count">${cols.length}</span>` : 'Schema';
+        let list = '';
+        if (cols.length > 0) {
+            list = cols.map((c, i) => {
+                const name = typeof c === 'string' ? c : (c.name || c.column || '');
+                const type = typeof c === 'string' ? '' : (c.type || c.dataType || '');
+                const pk = c.primaryKey ? '<span class="feat-badge" style="background:rgba(251,191,36,0.15);color:#fbbf24;font-size:9px">PK</span>' : '';
+                return `<div class="feat-card" style="cursor:default"
+                    onmouseenter="diagram._showColPopover('${nodeId}', ${i}, this)"
+                    onmouseleave="diagram._hideFeatPopover()">
+                    <div class="feat-card-header">
+                        <div class="feat-type-dot" style="background:#64748b"></div>
+                        <div class="feat-card-main"><div class="feat-card-name">${name}</div></div>
+                        ${pk}
+                        <div class="feat-card-type">${type}</div>
+                    </div>
+                </div>`;
+            }).join('');
+        } else {
+            list = `<div class="feat-empty-state">
+                <div class="feat-empty-icon">🗄️</div>
+                <div class="feat-empty-msg">No schema defined</div>
+            </div>`;
+        }
+        return `<div class="feature-explorer-header">
+            <div class="feature-explorer-title">
+                <span>🗄️ ${tableTitle}</span>
+            </div>
+        </div>
+        <div class="feature-list-scroll">${list}</div>`;
+    }
+
+    _buildEntityRight(node, nodeId) {
+        // Show feature views that use this entity
+        const usedBy = [];
+        this.nodes.nodes.forEach((n, nid) => {
+            if (n.type === 'featureview' && n.entities && n.entities.includes(nodeId)) {
+                usedBy.push({ id: nid, node: n });
+            }
+        });
+        let list = usedBy.length > 0
+            ? usedBy.map(({ id, node: fv }) => `
+                <div class="feat-card" onclick="diagram.selectNode('${id}')">
+                    <div class="feat-card-header">
+                        <div class="feat-type-dot" style="background:#10b981"></div>
+                        <div class="feat-card-main">
+                            <div class="feat-card-name">${fv.name}</div>
+                            <div class="feat-card-subdesc">${fv.subtype} • ${fv.features.length} features</div>
+                        </div>
+                        <div class="feat-card-arrow">›</div>
+                    </div>
+                </div>`).join('')
+            : `<div class="feat-empty-state">
+                <div class="feat-empty-icon">🔗</div>
+                <div class="feat-empty-msg">Not used by any feature views</div>
+              </div>`;
+        return `<div class="feature-explorer-header">
+            <div class="feature-explorer-title">
+                <span>🔗 Used by Feature Views</span>
+                ${usedBy.length > 0 ? `<span class="feat-count">${usedBy.length}</span>` : ''}
+            </div>
+        </div>
+        <div class="feature-list-scroll">${list}</div>`;
+    }
+
+    _showColPopover(nodeId, idx, el) {
+        const node = this.nodes.nodes.get(nodeId);
+        if (!node) return;
+        const cols = node.columns || node.schema || [];
+        const c = cols[idx];
+        if (!c) return;
+        const name = typeof c === 'string' ? c : (c.name || c.column || '');
+        const type = typeof c === 'string' ? '' : (c.type || '');
+        const desc = c.description || '';
+
+        let html = `<div class="feat-popover-name">${name}</div>
+            <div class="feat-popover-type">${type || 'Column'}</div>`;
+        if (desc) html += `<div class="feat-popover-desc">${desc}</div>`;
+
+        const rows = [];
+        if (c.primaryKey) rows.push(['Primary Key', '✅ Yes']);
+        if (c.nullable != null) rows.push(['Nullable', c.nullable ? 'Yes' : 'No']);
+        if (c.defaultValue) rows.push(['Default', c.defaultValue]);
+        if (rows.length > 0) {
+            html += `<div class="feat-popover-grid">${rows.map(([k,v]) =>
+                `<span class="feat-popover-k">${k}</span><span class="feat-popover-v">${v}</span>`
+            ).join('')}</div>`;
+        }
+
+        const popover = document.getElementById('featHoverPopover');
+        document.getElementById('featPopoverInner').innerHTML = html;
+        const rect = el.getBoundingClientRect();
+        const panel = document.getElementById('detailPanel');
+        const panelRect = panel ? panel.getBoundingClientRect() : { left: window.innerWidth };
+        const popW = 240;
+        let left = panelRect.left - popW - 12;
+        if (left < 8) left = rect.right + 10;
+        let top = rect.top - 8;
+        if (top + 160 > window.innerHeight - 16) top = window.innerHeight - 176;
+        if (top < 8) top = 8;
+        popover.style.left = left + 'px';
+        popover.style.top = top + 'px';
+        popover.style.width = popW + 'px';
+        popover.classList.add('visible');
     }
 
     _buildNodeDetails(id, node, config, icon) {
@@ -1828,139 +1943,85 @@ class FeastDiagram {
         return html;
     }
 
-    _buildFeatureExplorer(node) {
-        const types = [...new Set(node.features.map(f => f.type))].sort();
+    _buildFeatureExplorer(node, nodeId) {
+        const features = node.features || [];
+        const types = [...new Set(features.map(f => f.type).filter(Boolean))].sort();
         const typePills = types.map(t => `<span class="feat-type-pill" data-type="${t}">${t}</span>`).join('');
+
+        let listHtml;
+        if (features.length === 0) {
+            listHtml = `<div class="feat-empty-state">
+                <div class="feat-empty-icon">⚡</div>
+                <div class="feat-empty-msg">No features defined</div>
+                <button class="btn btn-primary" style="margin-top:12px;font-size:13px"
+                    onclick="diagram.showEditModal('${nodeId}')">+ Add Features</button>
+            </div>`;
+        } else {
+            listHtml = features.map((f, i) => this._buildFeatureCard(f, i, nodeId)).join('');
+        }
 
         return `<div class="feature-explorer-header">
             <div class="feature-explorer-title">
                 <span>⚡ Features</span>
-                <span class="feat-count">${node.features.length}</span>
+                <span class="feat-count">${features.length}</span>
+                ${node.type === 'featureview' ? `<button class="feat-add-btn" onclick="diagram.showEditModal('${nodeId}')" title="Edit features">✏️ Edit</button>` : ''}
             </div>
             <div class="feature-search-bar">
-                <input class="feature-search-input" id="featSearchInput" placeholder="Search features, types, tags…" oninput="diagram._filterFeatures(this.value)">
+                <input class="feature-search-input" id="featSearchInput"
+                    placeholder="Search name, type, tag…"
+                    oninput="diagram._filterFeatures(this.value)">
             </div>
-            <div class="feature-type-filters" id="featTypeFilters">
-                <span class="feat-type-pill active" data-type="all">All</span>
-                ${typePills}
-            </div>
+            ${types.length > 0 ? `<div class="feature-type-filters" id="featTypeFilters">
+                <span class="feat-type-pill active" data-type="all">All</span>${typePills}
+            </div>` : '<div id="featTypeFilters"></div>'}
         </div>
-        <div class="feature-list-scroll" id="featListScroll">
-            ${node.features.map((f, i) => this._buildFeatureCard(f, i)).join('')}
-        </div>`;
+        <div class="feature-list-scroll" id="featListScroll">${listHtml}</div>`;
     }
 
-    _buildFeatureCard(f, idx) {
-        // Support both old format {name, type} and new rich format
-        const name = f.name || f;
-        const type = f.type || 'Unknown';
+    _buildFeatureCard(f, idx, nodeId) {
+        const name = (typeof f === 'string') ? f : (f.name || '');
+        const type = (typeof f === 'string') ? '' : (f.type || 'Unknown');
         const desc = f.description || '';
         const tags = f.tags || [];
         const hasPii = f.security && f.security.pii;
         const onlineServing = f.serving && f.serving.online;
         const offlineServing = f.serving && f.serving.offline;
-        const hasRichData = f.description || f.tags || f.sourceColumn || f.transformation ||
-                            f.validation || f.serving || f.security || f.quality || f.statistics;
 
-        // Type color
-        const typeColors = { 'Int64':'#60a5fa','Int32':'#60a5fa','Float32':'#f59e0b','Float64':'#f59e0b',
-            'String':'#a78bfa','Bool':'#34d399','Bytes':'#fb923c','UnixTimestamp':'#f472b6' };
-        const dotColor = typeColors[type] || '#94a3b8';
+        const typeColors = {
+            'Int64':'#60a5fa','Int32':'#60a5fa','Int16':'#60a5fa','Int8':'#60a5fa',
+            'Float32':'#f59e0b','Float64':'#f59e0b',
+            'String':'#a78bfa','Bool':'#34d399','Bytes':'#fb923c','UnixTimestamp':'#f472b6'
+        };
+        const dotColor = typeColors[type] || '#64748b';
 
         let badges = '';
         if (hasPii) badges += `<span class="feat-badge feat-badge-pii">PII</span>`;
-        if (onlineServing) badges += `<span class="feat-badge feat-badge-online">online</span>`;
-        if (offlineServing) badges += `<span class="feat-badge feat-badge-offline">offline</span>`;
+        if (onlineServing) badges += `<span class="feat-badge feat-badge-online">⚡</span>`;
+        if (offlineServing) badges += `<span class="feat-badge feat-badge-offline">💾</span>`;
 
-        let body = '';
-        if (hasRichData) {
-            body = `<div class="feat-card-body"><div class="feat-meta-grid">`;
+        const completeness = f.quality && f.quality.completeness;
+        const qualBar = completeness != null
+            ? `<div class="feat-quality-bar" title="Completeness: ${completeness}%"><div class="feat-quality-fill" style="width:${completeness}%"></div></div>` : '';
 
-            // Core section
-            let coreRows = '';
-            if (f.sourceColumn) coreRows += `<div class="feat-meta-row"><span class="feat-meta-key">Source</span><span class="feat-meta-val">${f.sourceColumn}</span></div>`;
-            if (f.defaultValue !== undefined) coreRows += `<div class="feat-meta-row"><span class="feat-meta-key">Default</span><span class="feat-meta-val">${f.defaultValue}</span></div>`;
-            if (f.owner) coreRows += `<div class="feat-meta-row"><span class="feat-meta-key">Owner</span><span class="feat-meta-val">${f.owner}</span></div>`;
-            if (coreRows) body += `<div class="feat-meta-section"><div class="feat-meta-section-title">Core</div>${coreRows}</div>`;
-
-            // Transformation
-            if (f.transformation) {
-                body += `<div class="feat-meta-section"><div class="feat-meta-section-title">Transform</div>
-                    <div class="feat-meta-row"><span class="feat-meta-val code" title="${f.transformation}">${f.transformation}</span></div>
-                </div>`;
-            }
-
-            // Serving
-            if (f.serving) {
-                let servRows = '';
-                if (f.serving.online !== undefined) servRows += `<div class="feat-meta-row"><span class="feat-meta-key">Online</span><span class="feat-meta-val">${f.serving.online ? '✅' : '❌'}</span></div>`;
-                if (f.serving.offline !== undefined) servRows += `<div class="feat-meta-row"><span class="feat-meta-key">Offline</span><span class="feat-meta-val">${f.serving.offline ? '✅' : '❌'}</span></div>`;
-                if (f.serving.ttl) servRows += `<div class="feat-meta-row"><span class="feat-meta-key">TTL</span><span class="feat-meta-val">${f.serving.ttl}s</span></div>`;
-                if (servRows) body += `<div class="feat-meta-section"><div class="feat-meta-section-title">Serving</div>${servRows}</div>`;
-            }
-
-            // Validation
-            if (f.validation) {
-                let valRows = '';
-                if (f.validation.min !== undefined) valRows += `<div class="feat-meta-row"><span class="feat-meta-key">Min</span><span class="feat-meta-val">${f.validation.min}</span></div>`;
-                if (f.validation.max !== undefined) valRows += `<div class="feat-meta-row"><span class="feat-meta-key">Max</span><span class="feat-meta-val">${f.validation.max}</span></div>`;
-                if (f.validation.nullable !== undefined) valRows += `<div class="feat-meta-row"><span class="feat-meta-key">Nullable</span><span class="feat-meta-val">${f.validation.nullable ? 'Yes' : 'No'}</span></div>`;
-                if (valRows) body += `<div class="feat-meta-section"><div class="feat-meta-section-title">Validation</div>${valRows}</div>`;
-            }
-
-            // Security
-            if (f.security) {
-                let secRows = '';
-                if (f.security.pii !== undefined) secRows += `<div class="feat-meta-row"><span class="feat-meta-key">PII</span><span class="feat-meta-val">${f.security.pii ? '🔴 Yes' : 'No'}</span></div>`;
-                if (f.security.classification) secRows += `<div class="feat-meta-row"><span class="feat-meta-key">Class</span><span class="feat-meta-val">${f.security.classification}</span></div>`;
-                if (f.security.sensitive !== undefined) secRows += `<div class="feat-meta-row"><span class="feat-meta-key">Sensitive</span><span class="feat-meta-val">${f.security.sensitive ? 'Yes' : 'No'}</span></div>`;
-                if (secRows) body += `<div class="feat-meta-section"><div class="feat-meta-section-title">Security</div>${secRows}</div>`;
-            }
-
-            // Quality
-            if (f.quality) {
-                let qualRows = '';
-                if (f.quality.freshness) qualRows += `<div class="feat-meta-row"><span class="feat-meta-key">Freshness</span><span class="feat-meta-val">${f.quality.freshness}</span></div>`;
-                if (f.quality.completeness !== undefined) {
-                    qualRows += `<div class="feat-meta-row"><span class="feat-meta-key">Complete</span><span class="feat-meta-val">${f.quality.completeness}%</span></div>
-                    <div class="feat-stat-bar"><div class="feat-stat-fill" style="width:${f.quality.completeness}%"></div></div>`;
-                }
-                if (f.quality.accuracy !== undefined) qualRows += `<div class="feat-meta-row"><span class="feat-meta-key">Accuracy</span><span class="feat-meta-val">${f.quality.accuracy}%</span></div>`;
-                if (qualRows) body += `<div class="feat-meta-section"><div class="feat-meta-section-title">Quality</div>${qualRows}</div>`;
-            }
-
-            // Statistics
-            if (f.statistics) {
-                let statRows = '';
-                if (f.statistics.mean !== undefined) statRows += `<div class="feat-meta-row"><span class="feat-meta-key">Mean</span><span class="feat-meta-val">${f.statistics.mean}</span></div>`;
-                if (f.statistics.stdDev !== undefined) statRows += `<div class="feat-meta-row"><span class="feat-meta-key">Std Dev</span><span class="feat-meta-val">${f.statistics.stdDev}</span></div>`;
-                if (f.statistics.nullCount !== undefined) statRows += `<div class="feat-meta-row"><span class="feat-meta-key">Nulls</span><span class="feat-meta-val">${f.statistics.nullCount.toLocaleString()}</span></div>`;
-                if (f.statistics.distinctCount !== undefined) statRows += `<div class="feat-meta-row"><span class="feat-meta-key">Distinct</span><span class="feat-meta-val">${f.statistics.distinctCount.toLocaleString()}</span></div>`;
-                if (statRows) body += `<div class="feat-meta-section"><div class="feat-meta-section-title">Statistics</div>${statRows}</div>`;
-            }
-
-            // Tags
-            if (tags.length > 0) {
-                body += `<div class="feat-meta-section" style="grid-column:1/-1">
-                    <div class="feat-meta-section-title">Tags</div>
-                    <div class="feat-tags-list">${tags.map(t => `<span class="feat-tag-chip">#${t}</span>`).join('')}</div>
-                </div>`;
-            }
-
-            body += `</div></div>`;
-        }
-
-        return `<div class="feat-card" data-idx="${idx}" data-type="${type}" data-name="${name.toLowerCase()}" data-tags="${tags.join(',').toLowerCase()}"
-                     onclick="diagram._toggleFeatureCard(this)">
+        return `<div class="feat-card"
+                     data-idx="${idx}" data-nodeid="${nodeId}"
+                     data-type="${type}" data-name="${name.toLowerCase()}"
+                     data-tags="${tags.join(',').toLowerCase()}"
+                     onclick="diagram._openFeatureModal('${nodeId}', ${idx})"
+                     onmouseenter="diagram._showFeatPopover('${nodeId}', ${idx}, this)"
+                     onmouseleave="diagram._hideFeatPopover()">
             <div class="feat-card-header">
                 <div class="feat-type-dot" style="background:${dotColor}"></div>
-                <div class="feat-card-name">${name}</div>
+                <div class="feat-card-main">
+                    <div class="feat-card-name">${name}</div>
+                    ${desc ? `<div class="feat-card-subdesc">${desc}</div>` : ''}
+                </div>
                 <div class="feat-card-badges">${badges}</div>
                 <div class="feat-card-type">${type}</div>
-                ${hasRichData ? '<div class="feat-card-chevron">▼</div>' : ''}
+                <div class="feat-card-arrow">›</div>
             </div>
-            ${desc ? `<div class="feat-card-desc">${desc}</div>` : ''}
-            ${body}
+            ${qualBar}
+            ${tags.length > 0 ? `<div class="feat-card-tags">${tags.slice(0,4).map(t=>`<span class="feat-tag-chip">#${t}</span>`).join('')}${tags.length>4?`<span class="feat-tag-chip">+${tags.length-4}</span>`:''}</div>` : ''}
         </div>`;
     }
 
@@ -1979,7 +2040,7 @@ class FeastDiagram {
         });
     }
 
-    _bindFeatureExplorer(node) {
+    _bindFeatureExplorer(node, nodeId) {
         const filters = document.getElementById('featTypeFilters');
         if (!filters) return;
         filters.addEventListener('click', e => {
@@ -1987,8 +2048,7 @@ class FeastDiagram {
             if (!pill) return;
             filters.querySelectorAll('.feat-type-pill').forEach(p => p.classList.remove('active'));
             pill.classList.add('active');
-            const q = document.getElementById('featSearchInput')?.value || '';
-            this._filterFeatures(q);
+            this._filterFeatures(document.getElementById('featSearchInput')?.value || '');
         });
     }
 
@@ -5763,6 +5823,406 @@ the registry, online store, and offline store settings.
         }
     }
 
+
+    // ===================================================
+    // FEATURE DETAIL MODAL
+    // ===================================================
+
+    _openFeatureModal(nodeId, idx) {
+        const node = this.nodes.nodes.get(nodeId);
+        if (!node) return;
+        const features = node.features || [];
+        const f = features[idx];
+        if (!f) return;
+
+        // Store context for save
+        this._fdmContext = { nodeId, idx };
+
+        const name = typeof f === 'string' ? f : (f.name || '');
+        const type = typeof f === 'string' ? '' : (f.type || '');
+        const typeColors = {
+            'Int64':'#60a5fa','Int32':'#60a5fa','Int16':'#60a5fa','Int8':'#60a5fa',
+            'Float32':'#f59e0b','Float64':'#f59e0b','String':'#a78bfa',
+            'Bool':'#34d399','Bytes':'#fb923c','UnixTimestamp':'#f472b6'
+        };
+
+        document.getElementById('fdmTypeDot').style.background = typeColors[type] || '#64748b';
+        document.getElementById('fdmName').textContent = name;
+        document.getElementById('fdmSubtitle').textContent = `${node.name} • ${type}`;
+
+        // Badges
+        let badges = '';
+        if (f.security && f.security.pii) badges += `<span class="feat-badge feat-badge-pii">PII</span>`;
+        if (f.serving && f.serving.online) badges += `<span class="feat-badge feat-badge-online">⚡ online</span>`;
+        if (f.serving && f.serving.offline) badges += `<span class="feat-badge feat-badge-offline">💾 offline</span>`;
+        document.getElementById('fdmBadges').innerHTML = badges;
+
+        // Show overview tab by default
+        document.querySelectorAll('.fdm-tab').forEach(t => t.classList.remove('active'));
+        document.querySelector('.fdm-tab').classList.add('active');
+        this._renderFdmTab('overview', f, node);
+
+        document.getElementById('fdmEditMode').style.display = 'none';
+        document.getElementById('fdmViewMode').style.display = '';
+        document.getElementById('fdmEditBtn').textContent = '✏️ Edit';
+
+        document.getElementById('featureDetailModal').classList.add('active');
+    }
+
+    _closeFeatureModal() {
+        document.getElementById('featureDetailModal').classList.remove('active');
+        this._fdmContext = null;
+    }
+
+    _switchFdmTab(btn, tab) {
+        document.querySelectorAll('.fdm-tab').forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+        if (!this._fdmContext) return;
+        const node = this.nodes.nodes.get(this._fdmContext.nodeId);
+        const f = node.features[this._fdmContext.idx];
+        this._renderFdmTab(tab, f, node);
+    }
+
+    _renderFdmTab(tab, f, node) {
+        const el = document.getElementById('fdmTabContent');
+        if (!el) return;
+
+        const row = (k, v, cls='') => (v != null && v !== '' && v !== undefined)
+            ? `<div class="fdm-row"><span class="fdm-k">${k}</span><span class="fdm-v ${cls}">${v}</span></div>` : '';
+
+        const sec = (title, rows, fullWidth=false) => rows
+            ? `<div class="fdm-section${fullWidth?' full':''}"><div class="fdm-section-title">${title}</div>${rows}</div>` : '';
+
+        const progressBar = (label, val) => val != null ? `
+            <div class="fdm-progress">
+                <div class="fdm-progress-label"><span>${label}</span><span>${val}%</span></div>
+                <div class="fdm-progress-track">
+                    <div class="fdm-progress-fill" style="width:${val}%;background:${val>=95?'var(--feast-green)':val>=80?'#f59e0b':'#f87171'}"></div>
+                </div>
+            </div>` : '';
+
+        if (tab === 'overview') {
+            const tags = f.tags || [];
+            el.innerHTML = `<div class="fdm-grid">
+                ${sec('Core',
+                    row('Name', f.name, 'green') +
+                    row('Type', f.type) +
+                    row('Owner', f.owner) +
+                    row('Source Column', f.sourceColumn) +
+                    row('Default Value', f.defaultValue)
+                )}
+                <div class="fdm-section">
+                    <div class="fdm-section-title">Transformation</div>
+                    ${f.transformation
+                        ? `<div class="fdm-code">${f.transformation}</div>`
+                        : `<div class="fdm-no-data">No transformation defined</div>`}
+                </div>
+                ${f.description ? `<div class="fdm-section full">
+                    <div class="fdm-section-title">Description</div>
+                    <div style="font-size:13px;color:var(--text-secondary);line-height:1.6">${f.description}</div>
+                </div>` : ''}
+                ${tags.length > 0 ? `<div class="fdm-section full">
+                    <div class="fdm-section-title">Tags</div>
+                    <div class="fdm-tags">${tags.map(t=>`<span class="fdm-tag">#${t}</span>`).join('')}</div>
+                </div>` : ''}
+            </div>`;
+
+        } else if (tab === 'serving') {
+            const s = f.serving || {};
+            const v = f.validation || {};
+            const hasServing = s.online != null || s.offline != null || s.ttl != null;
+            const hasVal = v.min != null || v.max != null || v.nullable != null;
+            el.innerHTML = `<div class="fdm-grid">
+                <div class="fdm-section">
+                    <div class="fdm-section-title">Serving</div>
+                    ${hasServing
+                        ? row('Online', s.online != null ? (s.online ? '✅ Enabled' : '❌ Disabled') : null) +
+                          row('Offline', s.offline != null ? (s.offline ? '✅ Enabled' : '❌ Disabled') : null) +
+                          row('TTL', s.ttl ? s.ttl + 's' : null)
+                        : '<div class="fdm-no-data">No serving config</div>'}
+                </div>
+                <div class="fdm-section">
+                    <div class="fdm-section-title">Validation</div>
+                    ${hasVal
+                        ? row('Min', v.min) + row('Max', v.max) +
+                          row('Nullable', v.nullable != null ? (v.nullable ? 'Yes' : 'No') : null)
+                        : '<div class="fdm-no-data">No validation rules</div>'}
+                </div>
+            </div>`;
+
+        } else if (tab === 'quality') {
+            const q = f.quality || {};
+            const hasQ = q.freshness || q.completeness != null || q.accuracy != null;
+            el.innerHTML = `<div class="fdm-grid">
+                <div class="fdm-section full">
+                    <div class="fdm-section-title">Quality Metrics</div>
+                    ${hasQ ? row('Freshness', q.freshness) +
+                        progressBar('Completeness', q.completeness) +
+                        progressBar('Accuracy', q.accuracy)
+                        : '<div class="fdm-no-data">No quality metrics recorded</div>'}
+                </div>
+            </div>`;
+
+        } else if (tab === 'security') {
+            const sec = f.security || {};
+            const hasSec = sec.pii != null || sec.sensitive != null || sec.classification;
+            el.innerHTML = `<div class="fdm-grid">
+                <div class="fdm-section full">
+                    <div class="fdm-section-title">Security &amp; Compliance</div>
+                    ${hasSec
+                        ? row('PII', sec.pii != null ? (sec.pii ? '<span style="color:#f87171">🔴 Yes — handle with care</span>' : '✅ No') : null) +
+                          row('Sensitive', sec.sensitive != null ? (sec.sensitive ? '⚠️ Yes' : 'No') : null) +
+                          row('Classification', sec.classification)
+                        : '<div class="fdm-no-data">No security config</div>'}
+                </div>
+            </div>`;
+
+        } else if (tab === 'stats') {
+            const st = f.statistics || {};
+            const hasDist = st.mean != null || st.stdDev != null || st.min != null || st.max != null;
+            const hasCov = st.nullCount != null || st.distinctCount != null || st.totalCount != null;
+            el.innerHTML = `<div class="fdm-grid">
+                <div class="fdm-section">
+                    <div class="fdm-section-title">Distribution</div>
+                    ${hasDist
+                        ? row('Mean', st.mean) + row('Std Dev', st.stdDev) +
+                          row('Min', st.min) + row('Max', st.max)
+                        : '<div class="fdm-no-data">No distribution data</div>'}
+                </div>
+                <div class="fdm-section">
+                    <div class="fdm-section-title">Coverage</div>
+                    ${hasCov
+                        ? row('Null Count', st.nullCount != null ? st.nullCount.toLocaleString() : null, st.nullCount > 0 ? 'amber' : '') +
+                          row('Distinct', st.distinctCount != null ? st.distinctCount.toLocaleString() : null) +
+                          row('Total Rows', st.totalCount != null ? st.totalCount.toLocaleString() : null)
+                        : '<div class="fdm-no-data">No coverage data</div>'}
+                </div>
+            </div>`;
+        }
+    }
+
+    _toggleFeatureEdit() {
+        const viewMode = document.getElementById('fdmViewMode');
+        const editMode = document.getElementById('fdmEditMode');
+        const btn = document.getElementById('fdmEditBtn');
+        const isEditing = editMode.style.display !== 'none';
+
+        if (isEditing) {
+            editMode.style.display = 'none';
+            viewMode.style.display = '';
+            btn.classList.remove('active');
+            document.getElementById('fdmEditBtnIcon').textContent = '✏️';
+            document.getElementById('fdmEditBtnLabel').textContent = 'Edit';
+        } else {
+            if (!this._fdmContext) return;
+            const node = this.nodes.nodes.get(this._fdmContext.nodeId);
+            if (!node) return;
+            const f = node.features[this._fdmContext.idx];
+            this._renderFdmEditForm(f);
+            viewMode.style.display = 'none';
+            editMode.style.display = 'flex';
+            editMode.style.flexDirection = 'column';
+            btn.classList.add('active');
+            document.getElementById('fdmEditBtnIcon').textContent = '👁';
+            document.getElementById('fdmEditBtnLabel').textContent = 'View';
+        }
+    }
+
+    _renderFdmEditForm(f) {
+        const grid = document.getElementById('fdmEditGrid');
+
+        const field = (id, label, val, mono=false, textarea=false) => {
+            const cls = mono ? ' mono' : '';
+            const v = (val != null) ? String(val) : '';
+            if (textarea) return `<div class="fdm-field">
+                <div class="fdm-label">${label}</div>
+                <textarea class="fdm-textarea${cls}" id="fdmF_${id}">${v}</textarea>
+            </div>`;
+            return `<div class="fdm-field">
+                <div class="fdm-label">${label}</div>
+                <input class="fdm-input${cls}" id="fdmF_${id}" value="${v.replace(/"/g,'&quot;')}">
+            </div>`;
+        };
+
+        const toggle = (id, label, val) => `<div class="fdm-toggle-row">
+            <span class="fdm-toggle-label">${label}</span>
+            <div class="fdm-switch${val ? ' on' : ''}" id="fdmT_${id}" onclick="this.classList.toggle('on')"></div>
+        </div>`;
+
+        grid.innerHTML = `
+        <div class="fdm-edit-section">
+            <div class="fdm-section-title">Core</div>
+            ${field('name', 'Name', f.name, true)}
+            ${field('type', 'Type', f.type, true)}
+            ${field('owner', 'Owner', f.owner)}
+            ${field('sourceColumn', 'Source Column', f.sourceColumn, true)}
+            ${field('defaultValue', 'Default Value', f.defaultValue, true)}
+        </div>
+        <div class="fdm-edit-section">
+            <div class="fdm-section-title">Description &amp; Tags</div>
+            ${field('description', 'Description', f.description, false, true)}
+            ${field('tags', 'Tags (comma-separated)', (f.tags||[]).join(', '))}
+        </div>
+        <div class="fdm-edit-section full">
+            <div class="fdm-section-title">Transformation SQL / Expression</div>
+            ${field('transformation', 'Expression', f.transformation, true, true)}
+        </div>
+        <div class="fdm-edit-section">
+            <div class="fdm-section-title">Serving</div>
+            ${toggle('serveOnline', 'Online Serving', f.serving && f.serving.online)}
+            ${toggle('serveOffline', 'Offline Serving', f.serving && f.serving.offline)}
+            ${field('serveTtl', 'TTL (seconds)', f.serving && f.serving.ttl, true)}
+        </div>
+        <div class="fdm-edit-section">
+            <div class="fdm-section-title">Validation</div>
+            ${field('valMin', 'Min Value', f.validation && f.validation.min, true)}
+            ${field('valMax', 'Max Value', f.validation && f.validation.max, true)}
+            ${toggle('valNullable', 'Nullable', f.validation && f.validation.nullable)}
+        </div>
+        <div class="fdm-edit-section">
+            <div class="fdm-section-title">Security</div>
+            ${toggle('secPii', 'PII Data', f.security && f.security.pii)}
+            ${toggle('secSensitive', 'Sensitive', f.security && f.security.sensitive)}
+            ${field('secClass', 'Classification', f.security && f.security.classification)}
+        </div>
+        <div class="fdm-edit-section">
+            <div class="fdm-section-title">Quality</div>
+            ${field('qualFreshness', 'Freshness', f.quality && f.quality.freshness)}
+            ${field('qualCompleteness', 'Completeness %', f.quality && f.quality.completeness, true)}
+            ${field('qualAccuracy', 'Accuracy %', f.quality && f.quality.accuracy, true)}
+        </div>
+        <div class="fdm-edit-section">
+            <div class="fdm-section-title">Statistics</div>
+            ${field('statMean', 'Mean', f.statistics && f.statistics.mean, true)}
+            ${field('statStdDev', 'Std Dev', f.statistics && f.statistics.stdDev, true)}
+            ${field('statNullCount', 'Null Count', f.statistics && f.statistics.nullCount, true)}
+            ${field('statDistinct', 'Distinct Count', f.statistics && f.statistics.distinctCount, true)}
+        </div>`;
+    }
+
+    _saveFeatureEdit() {
+        if (!this._fdmContext) return;
+        const { nodeId, idx } = this._fdmContext;
+        const node = this.nodes.nodes.get(nodeId);
+        if (!node) return;
+        const f = node.features[idx];
+        const g = id => document.getElementById(`fdmF_${id}`)?.value ?? '';
+        const tog = id => document.getElementById(`fdmT_${id}`)?.classList.contains('on') ?? false;
+        const num = id => { const v = parseFloat(g(id)); return isNaN(v) ? undefined : v; };
+        const str = id => g(id).trim() || undefined;
+
+        node.features[idx] = {
+            ...f,
+            name: g('name').trim() || f.name,
+            type: g('type').trim() || f.type,
+            owner: str('owner'),
+            sourceColumn: str('sourceColumn'),
+            defaultValue: g('defaultValue') !== '' ? g('defaultValue') : undefined,
+            description: str('description'),
+            tags: g('tags') ? g('tags').split(',').map(s => s.trim()).filter(Boolean) : (f.tags || []),
+            transformation: str('transformation'),
+            serving: { online: tog('serveOnline'), offline: tog('serveOffline'), ttl: num('serveTtl') },
+            validation: { min: num('valMin'), max: num('valMax'), nullable: tog('valNullable') },
+            security: { pii: tog('secPii'), sensitive: tog('secSensitive'), classification: str('secClass') },
+            quality: { freshness: str('qualFreshness'), completeness: num('qualCompleteness'), accuracy: num('qualAccuracy') },
+            statistics: { ...(f.statistics||{}), mean: num('statMean'), stdDev: num('statStdDev'), nullCount: num('statNullCount'), distinctCount: num('statDistinct') }
+        };
+
+        const savedCtx = { nodeId, idx };
+        this.showNotification('Saved', `Feature "${node.features[idx].name}" updated`);
+
+        // Refresh the panel behind the modal, then re-open modal
+        this.showPanel(savedCtx.nodeId);
+        this._fdmContext = savedCtx;
+        setTimeout(() => {
+            this._fdmContext = savedCtx;
+            this._openFeatureModal(savedCtx.nodeId, savedCtx.idx);
+        }, 60);
+    }
+
+    // ===================================================
+    // FEATURE HOVER POPOVER
+    // ===================================================
+
+    _showFeatPopover(nodeId, idx, el) {
+        const node = this.nodes.nodes.get(nodeId);
+        if (!node) return;
+        const f = (node.features || [])[idx];
+        if (!f) return;
+
+        const name = typeof f === 'string' ? f : (f.name || '');
+        const type = typeof f === 'string' ? '' : (f.type || '');
+        const typeColors = {
+            'Int64':'#60a5fa','Int32':'#60a5fa','Float32':'#f59e0b','Float64':'#f59e0b',
+            'String':'#a78bfa','Bool':'#34d399','Bytes':'#fb923c','UnixTimestamp':'#f472b6'
+        };
+        const dotColor = typeColors[type] || '#64748b';
+
+        let html = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <div style="width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0"></div>
+            <div class="feat-popover-name">${name}</div>
+        </div>
+        <div class="feat-popover-type">${type}</div>`;
+
+        if (f.description) html += `<div class="feat-popover-desc">${f.description}</div>`;
+
+        const rows = [];
+        if (f.owner) rows.push(['Owner', f.owner]);
+        if (f.sourceColumn) rows.push(['Source col', f.sourceColumn]);
+        if (f.serving && f.serving.ttl != null) rows.push(['TTL', f.serving.ttl + 's']);
+        if (f.quality && f.quality.completeness != null) rows.push(['Completeness', f.quality.completeness + '%']);
+        if (f.quality && f.quality.freshness) rows.push(['Freshness', f.quality.freshness]);
+        if (f.statistics && f.statistics.mean != null) rows.push(['Mean', f.statistics.mean]);
+        if (f.statistics && f.statistics.distinctCount != null) rows.push(['Distinct', f.statistics.distinctCount.toLocaleString()]);
+
+        if (rows.length > 0) {
+            html += `<div class="feat-popover-grid">${rows.map(([k,v]) =>
+                `<span class="feat-popover-k">${k}</span><span class="feat-popover-v">${v}</span>`
+            ).join('')}</div>`;
+        }
+
+        let badges = '';
+        if (f.security && f.security.pii) badges += `<span class="feat-badge feat-badge-pii">PII</span>`;
+        if (f.security && f.security.classification) badges += `<span class="feat-badge" style="background:var(--bg-tertiary);color:var(--text-muted)">${f.security.classification}</span>`;
+        if (f.serving && f.serving.online) badges += `<span class="feat-badge feat-badge-online">⚡ online</span>`;
+        if (f.serving && f.serving.offline) badges += `<span class="feat-badge feat-badge-offline">💾 offline</span>`;
+        if (badges) html += `<div class="feat-popover-badges">${badges}</div>`;
+
+        if (f.transformation) {
+            html += `<div style="margin-top:8px;font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:0.06em">Transform</div>
+                <div style="margin-top:3px;background:var(--bg-tertiary);padding:5px 8px;border-radius:5px;font-family:monospace;font-size:10px;color:var(--text-secondary);word-break:break-all">${f.transformation.length > 80 ? f.transformation.slice(0,80)+'…' : f.transformation}</div>`;
+        }
+
+        html += `<div style="margin-top:10px;font-size:10px;color:var(--text-muted);text-align:center">Click to view full details</div>`;
+
+        const popover = document.getElementById('featHoverPopover');
+        document.getElementById('featPopoverInner').innerHTML = html;
+
+        // Smart positioning: to the LEFT of the panel
+        const rect = el.getBoundingClientRect();
+        const panel = document.getElementById('detailPanel');
+        const panelRect = panel ? panel.getBoundingClientRect() : { left: window.innerWidth };
+
+        const popW = 260;
+        let left = panelRect.left - popW - 12;
+        if (left < 8) left = rect.right + 10; // fallback right of card
+
+        let top = rect.top - 8;
+        const estimatedHeight = 280;
+        if (top + estimatedHeight > window.innerHeight - 16) {
+            top = window.innerHeight - estimatedHeight - 16;
+        }
+        if (top < 8) top = 8;
+
+        popover.style.left = left + 'px';
+        popover.style.top = top + 'px';
+        popover.style.width = popW + 'px';
+        popover.classList.add('visible');
+    }
+
+    _hideFeatPopover() {
+        document.getElementById('featHoverPopover')?.classList.remove('visible');
+    }
 
 // Make globally available for HTML onclick handlers
 

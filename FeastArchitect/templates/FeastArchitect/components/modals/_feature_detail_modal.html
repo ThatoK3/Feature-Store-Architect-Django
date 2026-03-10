@@ -1,0 +1,47 @@
+<!-- Feature Detail Modal -->
+<div class="modal-overlay" id="featureDetailModal" onclick="if(event.target===this)diagram._closeFeatureModal()">
+    <div class="modal fdm-modal">
+        <!-- Header -->
+        <div class="fdm-header">
+            <div class="fdm-title-row">
+                <div class="fdm-type-dot" id="fdmTypeDot"></div>
+                <div class="fdm-title-text">
+                    <div class="fdm-name" id="fdmName">feature_name</div>
+                    <div class="fdm-subtitle" id="fdmSubtitle">FeatureView • String</div>
+                </div>
+                <div class="fdm-badges" id="fdmBadges"></div>
+                <div style="flex:1"></div>
+                <button class="fdm-edit-btn" id="fdmEditBtn" onclick="diagram._toggleFeatureEdit()">
+                    <span id="fdmEditBtnIcon">✏️</span>
+                    <span id="fdmEditBtnLabel">Edit</span>
+                </button>
+                <button class="modal-close" onclick="diagram._closeFeatureModal()">✕</button>
+            </div>
+        </div>
+
+        <!-- VIEW MODE -->
+        <div id="fdmViewMode">
+            <div class="fdm-tabs" id="fdmTabs">
+                <button class="fdm-tab active" data-tab="overview" onclick="diagram._switchFdmTab(this,'overview')">Overview</button>
+                <button class="fdm-tab" data-tab="serving" onclick="diagram._switchFdmTab(this,'serving')">Serving &amp; Validation</button>
+                <button class="fdm-tab" data-tab="quality" onclick="diagram._switchFdmTab(this,'quality')">Quality</button>
+                <button class="fdm-tab" data-tab="security" onclick="diagram._switchFdmTab(this,'security')">Security</button>
+                <button class="fdm-tab" data-tab="stats" onclick="diagram._switchFdmTab(this,'stats')">Statistics</button>
+            </div>
+            <div class="fdm-tab-content" id="fdmTabContent">
+                <div class="fdm-empty">Select a tab to view details</div>
+            </div>
+        </div>
+
+        <!-- EDIT MODE -->
+        <div id="fdmEditMode" style="display:none">
+            <div class="fdm-edit-scroll">
+                <div class="fdm-edit-grid" id="fdmEditGrid"></div>
+            </div>
+            <div class="fdm-edit-actions">
+                <button class="btn btn-secondary" onclick="diagram._toggleFeatureEdit()">Cancel</button>
+                <button class="btn btn-primary" onclick="diagram._saveFeatureEdit()">💾 Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
