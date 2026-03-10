@@ -506,7 +506,7 @@ class FeastDiagram {
             node.x + 12, contentY);
         
         // Subtype badge
-        ctx.fillStyle = getSubtypeColor(node.subtype);
+        ctx.fillStyle = this.getSubtypeColor(node.subtype);
         this.renderer.roundRect(node.x + this.config.nodeWidth - 60, node.y + 50, 48, 18, 9);
         ctx.fill();
         ctx.fillStyle = 'white';
@@ -909,8 +909,11 @@ class FeastDiagram {
      * Close detail panel
      */
     closePanel() {
-        this.ui.togglePanel('detail', false);
+        const panel = document.getElementById('detailPanel');
+        panel.classList.remove('open');
+        panel.classList.remove('wide');
         this.selectedNode = null;
+        this.render();
     }
 
     /**
@@ -1149,6 +1152,11 @@ class FeastDiagram {
             this.ui.showNotification('Loaded', `Repository "${data.name}" loaded`);
             
             setTimeout(() => this.animateFit(), 500);
+            // Auto-open the first featureview node on load
+            setTimeout(() => {
+                const firstFV = Array.from(this.nodes.nodes.values()).find(n => n.type === 'featureview');
+                if (firstFV) this.selectNode(firstFV.id);
+            }, 700);
             
         } catch (error) {
             console.error('Failed to load from backend:', error);
@@ -1675,307 +1683,313 @@ class FeastDiagram {
         const node = this.nodes.nodes.get(id);
         const panel = document.getElementById('detailPanel');
         const config = this.config.colors[node.type];
-        
+
         let icon = config.icon;
-        if (node.type === 'datasource' && node.dbType && node.dbType.icon) {
-            icon = node.dbType.icon;
-        }
-        
+        if (node.type === 'datasource' && node.dbType && node.dbType.icon) icon = node.dbType.icon;
+
         document.getElementById('panelIcon').textContent = icon;
         document.getElementById('panelType').textContent = config.label;
         document.getElementById('panelType').style.color = config.light;
         document.getElementById('panelBadge').style.background = `${config.bg}20`;
-        
         document.getElementById('panelTitle').textContent = node.name;
-        
+
         let subtitle = '';
-        if (node.type === 'featureview') {
-            subtitle = `${node.subtype} • ${node.features.length} features`;
-        } else if (node.type === 'service') {
-            const totalDeps = node.features.length + (node.featureServices ? node.featureServices.length : 0);
-            subtitle = `${totalDeps} dependencies`;
-        } else if (node.type === 'entity') {
-            subtitle = `Join key: ${node.joinKey}`;
-        } else if (node.type === 'datasource') {
-            const dbName = node.dbType ? node.dbType.name : node.kind;
-            subtitle = `${dbName} • ${node.ownedBy}`;
-        }
+        if (node.type === 'featureview') subtitle = `${node.subtype} • ${node.features.length} features`;
+        else if (node.type === 'service') subtitle = `${(node.features.length + (node.featureServices ? node.featureServices.length : 0))} dependencies`;
+        else if (node.type === 'entity') subtitle = `Join key: ${node.joinKey}`;
+        else if (node.type === 'datasource') subtitle = `${node.dbType ? node.dbType.name : node.kind} • ${node.ownedBy}`;
         document.getElementById('panelSubtitle').textContent = subtitle;
-        
+
         const tagsContainer = document.getElementById('panelTags');
-        if (node.tags && node.tags.length > 0) {
-            tagsContainer.innerHTML = node.tags.map(tag => 
-                `<span class="tag">#${tag}</span>`
-            ).join('');
+        tagsContainer.innerHTML = (node.tags && node.tags.length > 0)
+            ? node.tags.map(t => `<span class="tag">#${t}</span>`).join('')
+            : '';
+
+        const contentEl = document.getElementById('panelContent');
+
+        // Wide mode for featureviews with features
+        const isWide = node.type === 'featureview' && node.features && node.features.length > 0;
+        panel.classList.toggle('wide', isWide);
+
+        if (isWide) {
+            contentEl.innerHTML = `
+                <div class="panel-wide-layout">
+                    <div class="panel-left-col" id="panelLeftCol"></div>
+                    <div class="panel-right-col" id="panelRightCol"></div>
+                </div>`;
+            document.getElementById('panelLeftCol').innerHTML = this._buildNodeDetails(id, node, config, icon);
+            document.getElementById('panelRightCol').innerHTML = this._buildFeatureExplorer(node);
+            this._bindFeatureExplorer(node);
         } else {
-            tagsContainer.innerHTML = '';
+            contentEl.innerHTML = this._buildNodeDetails(id, node, config, icon);
         }
-        
-        const content = document.getElementById('panelContent');
+
+        panel.classList.add('open');
+    }
+
+    _buildNodeDetails(id, node, config, icon) {
         let html = '';
-        
+
         if (node.description) {
-            html += `
-                <div class="panel-section">
-                    <div class="section-header">
-                        <div class="section-title">Description</div>
-                    </div>
-                    <div class="notes-section">
-                        <div class="notes-text">${node.description}</div>
-                    </div>
-                </div>
-            `;
+            html += `<div class="panel-section">
+                <div class="section-header"><div class="section-title">Description</div></div>
+                <div class="notes-section"><div class="notes-text">${node.description}</div></div>
+            </div>`;
         }
-        
+
         html += `<div class="panel-section"><div class="detail-card">`;
-        
+
         if (node.type === 'entity') {
             html += `
-                <div class="detail-row">
-                    <span class="detail-label">Join Key</span>
-                    <span class="detail-value highlight">${node.joinKey}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Used By</span>
-                    <span class="detail-value">${this.getUsedByCount(id)} views</span>
-                </div>
-            `;
+                <div class="detail-row"><span class="detail-label">Join Key</span><span class="detail-value highlight">${node.joinKey}</span></div>
+                <div class="detail-row"><span class="detail-label">Used By</span><span class="detail-value">${this.getUsedByCount(id)} views</span></div>`;
         } else if (node.type === 'featureview') {
             html += `
-                <div class="detail-row">
-                    <span class="detail-label">Type</span>
-                    <span class="detail-value" style="color: ${this.getSubtypeColor(node.subtype)}">${node.subtype}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Entities</span>
-                    <span class="detail-value">${node.entities.length}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Features</span>
-                    <span class="detail-value">${node.features.length}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">TTL</span>
-                    <span class="detail-value">${node.details.ttl || 'Not set'}</span>
-                </div>
-            `;
+                <div class="detail-row"><span class="detail-label">Type</span><span class="detail-value" style="color:${this.getSubtypeColor(node.subtype)}">${node.subtype}</span></div>
+                <div class="detail-row"><span class="detail-label">Entities</span><span class="detail-value">${node.entities.length}</span></div>
+                <div class="detail-row"><span class="detail-label">Features</span><span class="detail-value">${node.features.length}</span></div>
+                <div class="detail-row"><span class="detail-label">TTL</span><span class="detail-value">${node.details && node.details.ttl ? node.details.ttl + 's' : 'Not set'}</span></div>`;
         } else if (node.type === 'service') {
             html += `
-                <div class="detail-row">
-                    <span class="detail-label">Feature Views</span>
-                    <span class="detail-value">${node.features.length}</span>
-                </div>
-                ${node.featureServices && node.featureServices.length > 0 ? `
-                <div class="detail-row">
-                    <span class="detail-label">Feature Services</span>
-                    <span class="detail-value">${node.featureServices.length}</span>
-                </div>
-                ` : ''}
-                <div class="detail-row">
-                    <span class="detail-label">Used By</span>
-                    <span class="detail-value">${node.details.usedBy ? node.details.usedBy.length : 0} applications</span>
-                </div>
-            `;
+                <div class="detail-row"><span class="detail-label">Feature Views</span><span class="detail-value">${node.features.length}</span></div>
+                ${node.featureServices && node.featureServices.length > 0 ? `<div class="detail-row"><span class="detail-label">Feature Services</span><span class="detail-value">${node.featureServices.length}</span></div>` : ''}
+                <div class="detail-row"><span class="detail-label">Used By</span><span class="detail-value">${node.details && node.details.usedBy ? node.details.usedBy.length : 0} applications</span></div>`;
         } else if (node.type === 'datasource') {
             const dbName = node.dbType ? node.dbType.name : node.kind;
             html += `
-                <div class="detail-row">
-                    <span class="detail-label">Type</span>
-                    <span class="detail-value">${dbName}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Category</span>
-                    <span class="detail-value">${node.dbType ? node.dbType.category : 'Unknown'}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Debezium Support</span>
-                    <span class="detail-value">${node.debeziumAvailable ? '✅ Yes' : '❌ No'}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Owned By</span>
-                    <span class="detail-value">${node.ownedBy}</span>
-                </div>
-                ${node.details.connection ? `
-                <div class="detail-row">
-                    <span class="detail-label">Connection</span>
-                    <span class="detail-value" style="font-size: 11px;">${node.details.connection}</span>
-                </div>
-                ` : ''}
-            `;
-            
+                <div class="detail-row"><span class="detail-label">Type</span><span class="detail-value">${dbName}</span></div>
+                <div class="detail-row"><span class="detail-label">Category</span><span class="detail-value">${node.dbType ? node.dbType.category : 'Unknown'}</span></div>
+                <div class="detail-row"><span class="detail-label">Debezium</span><span class="detail-value">${node.debeziumAvailable ? '✅ Yes' : '❌ No'}</span></div>
+                <div class="detail-row"><span class="detail-label">Owned By</span><span class="detail-value">${node.ownedBy}</span></div>
+                ${node.details && node.details.connection ? `<div class="detail-row"><span class="detail-label">Connection</span><span class="detail-value" style="font-size:11px">${node.details.connection}</span></div>` : ''}`;
+
             if (node.accessProcess) {
-                html += `</div></div>
-                <div class="panel-section">
-                    <div class="section-header">
-                        <div class="section-title">Access Process</div>
-                    </div>
-                    <div class="notes-section">
-                        <div class="notes-text">${node.accessProcess}</div>
-                    </div>
-                    <button class="access-request-btn" onclick="diagram.requestAccess('${id}')">
-                        <span>🔐</span>
-                        <span>Request Access</span>
-                    </button>
-                </div>
-                <div class="panel-section"><div class="detail-card">`;
+                html += `</div></div><div class="panel-section">
+                    <div class="section-header"><div class="section-title">Access Process</div></div>
+                    <div class="notes-section"><div class="notes-text">${node.accessProcess}</div></div>
+                    <button class="access-request-btn" onclick="diagram.requestAccess('${id}')"><span>🔐</span><span>Request Access</span></button>
+                </div><div class="panel-section"><div class="detail-card">`;
             }
         }
-        
+
         html += `</div></div>`;
-        
-        if (node.type === 'featureview' && node.features.length > 0) {
-            html += `
-                <div class="panel-section">
-                    <div class="section-header">
-                        <div class="section-title">Features</div>
-                        <div class="section-badge">${node.features.length}</div>
-                    </div>
-                    <div class="feature-list">
-                        ${node.features.map(f => `
-                            <div class="feature-item">
-                                <div class="feature-info">
-                                    <div class="feature-icon">⚡</div>
-                                    <div>
-                                        <div class="feature-name">${f.name}</div>
-                                        <div class="feature-type">${f.type}</div>
-                                    </div>
-                                </div>
-                                <span class="feature-badge">${f.type}</span>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            `;
-        }
-        
-        html += `
-            <div class="panel-section">
-                <div class="section-header">
-                    <div class="section-title">Lineage</div>
-                </div>
-                <div class="connection-graph">
-        `;
-        
-        if (node.inputs.length > 0) {
-            node.inputs.forEach(inputId => {
-                const input = this.nodes.nodes.get(inputId);
-                if (input && this.isNodeVisible(input)) {
-                    const inputConfig = this.config.colors[input.type];
-                    let inputIcon = inputConfig.icon;
-                    if (input.type === 'datasource' && input.dbType && input.dbType.icon) {
-                        inputIcon = input.dbType.icon;
-                    }
-                    html += `
-                        <div class="connection-node" onclick="diagram.selectNode('${inputId}')">
-                            <div class="connection-icon" style="background: ${inputConfig.bg}20; color: ${inputConfig.light};">
-                                ${inputIcon}
-                            </div>
-                            <div class="connection-info">
-                                <div class="connection-name">${input.name}</div>
-                                <div class="connection-meta">${inputConfig.label}</div>
-                            </div>
-                            <span class="connection-arrow">←</span>
-                        </div>
-                    `;
-                }
-            });
-        }
-        
-        html += `
-            <div class="connection-node" style="border-color: ${config.bg}; background: ${config.bg}10;">
-                <div class="connection-icon" style="background: ${config.bg}20; color: ${config.light};">
-                    ${icon}
-                </div>
-                <div class="connection-info">
-                    <div class="connection-name">${node.name}</div>
-                    <div class="connection-meta" style="color: ${config.light};">${config.label}</div>
-                </div>
-            </div>
-        `;
-        
-        if (node.outputs.length > 0) {
-            node.outputs.forEach(outputId => {
-                const output = this.nodes.nodes.get(outputId);
-                if (output && this.isNodeVisible(output)) {
-                    const outputConfig = this.config.colors[output.type];
-                    let outputIcon = outputConfig.icon;
-                    if (output.type === 'datasource' && output.dbType && output.dbType.icon) {
-                        outputIcon = output.dbType.icon;
-                    }
-                    html += `
-                        <div class="connection-node" onclick="diagram.selectNode('${outputId}')">
-                            <div class="connection-icon" style="background: ${outputConfig.bg}20; color: ${outputConfig.light};">
-                                ${outputIcon}
-                            </div>
-                            <div class="connection-info">
-                                <div class="connection-name">${output.name}</div>
-                                <div class="connection-meta">${outputConfig.label}</div>
-                            </div>
-                            <span class="connection-arrow">→</span>
-                        </div>
-                    `;
-                }
-            });
-        }
-        
+
+        // Lineage
+        html += `<div class="panel-section"><div class="section-header"><div class="section-title">Lineage</div></div><div class="connection-graph">`;
+        node.inputs.forEach(inputId => {
+            const inp = this.nodes.nodes.get(inputId);
+            if (!inp || !this.isNodeVisible(inp)) return;
+            const ic = this.config.colors[inp.type];
+            const ii = (inp.type === 'datasource' && inp.dbType) ? inp.dbType.icon : ic.icon;
+            html += `<div class="connection-node" onclick="diagram.selectNode('${inputId}')">
+                <div class="connection-icon" style="background:${ic.bg}20;color:${ic.light}">${ii}</div>
+                <div class="connection-info"><div class="connection-name">${inp.name}</div><div class="connection-meta">${ic.label}</div></div>
+                <span class="connection-arrow">←</span></div>`;
+        });
+        html += `<div class="connection-node" style="border-color:${config.bg};background:${config.bg}10">
+            <div class="connection-icon" style="background:${config.bg}20;color:${config.light}">${icon}</div>
+            <div class="connection-info"><div class="connection-name">${node.name}</div><div class="connection-meta" style="color:${config.light}">${config.label}</div></div>
+        </div>`;
+        node.outputs.forEach(outputId => {
+            const out = this.nodes.nodes.get(outputId);
+            if (!out || !this.isNodeVisible(out)) return;
+            const oc = this.config.colors[out.type];
+            const oi = (out.type === 'datasource' && out.dbType) ? out.dbType.icon : oc.icon;
+            html += `<div class="connection-node" onclick="diagram.selectNode('${outputId}')">
+                <div class="connection-icon" style="background:${oc.bg}20;color:${oc.light}">${oi}</div>
+                <div class="connection-info"><div class="connection-name">${out.name}</div><div class="connection-meta">${oc.label}</div></div>
+                <span class="connection-arrow">→</span></div>`;
+        });
         html += `</div></div>`;
-        
-        if (node.details.usedBy && node.details.usedBy.length > 0) {
-            html += `
-                <div class="panel-section">
-                    <div class="section-header">
-                        <div class="section-title">Used By Applications</div>
-                        <div class="section-badge">${node.details.usedBy.length}</div>
-                    </div>
-                    <div class="service-usage">
-                        ${node.details.usedBy.map((app, idx) => {
-                            const appData = typeof app === 'string' ? { name: app } : app;
-                            return `
-                            <div class="usage-card" onclick="diagram.showUsageDetails(${idx})">
-                                <div class="usage-details">ℹ️</div>
-                                <div class="usage-icon" style="background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white;">
-                                    🖥️
-                                </div>
-                                <div class="usage-name">${appData.name}</div>
-                                <div class="usage-type">${appData.environment || 'Production'}</div>
-                                ${appData.sla ? `<div style="font-size: 10px; color: var(--text-muted); margin-top: 4px;">SLA: ${appData.sla}</div>` : ''}
-                            </div>
-                        `}).join('')}
-                    </div>
-                </div>
-            `;
+
+        // Used By
+        if (node.details && node.details.usedBy && node.details.usedBy.length > 0) {
+            html += `<div class="panel-section"><div class="section-header"><div class="section-title">Used By</div><div class="section-badge">${node.details.usedBy.length}</div></div><div class="service-usage">`;
+            node.details.usedBy.forEach((app, idx) => {
+                const appData = typeof app === 'string' ? { name: app } : app;
+                html += `<div class="usage-card" onclick="diagram.showUsageDetails(${idx})">
+                    <div class="usage-details">ℹ️</div>
+                    <div class="usage-icon" style="background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:white">🖥️</div>
+                    <div class="usage-name">${appData.name}</div>
+                    <div class="usage-type">${appData.environment || 'Production'}</div>
+                </div>`;
+            });
+            html += `</div></div>`;
         }
-        
-        if (node.details.notes) {
-            html += `
-                <div class="panel-section">
-                    <div class="section-header">
-                        <div class="section-title">Notes</div>
-                    </div>
-                    <div class="notes-section">
-                        <div class="notes-text">${node.details.notes}</div>
-                    </div>
-                </div>
-            `;
+
+        if (node.details && node.details.notes) {
+            html += `<div class="panel-section"><div class="section-header"><div class="section-title">Notes</div></div><div class="notes-section"><div class="notes-text">${node.details.notes}</div></div></div>`;
         }
-        
-        html += `
-            <div class="panel-section">
-                <div class="section-header">
-                    <div class="section-title">Python API</div>
-                </div>
-                <div class="code-block">
-                    <div class="code-header">
-                        <span class="code-lang">Python</span>
-                        <button class="code-copy" onclick="diagram.copyCode(this)">Copy</button>
-                    </div>
-                    <div class="code-content">${this.generateCodeExample(node)}</div>
-                </div>
+
+        html += `<div class="panel-section"><div class="section-header"><div class="section-title">Python API</div></div>
+            <div class="code-block"><div class="code-header"><span class="code-lang">Python</span><button class="code-copy" onclick="diagram.copyCode(this)">Copy</button></div>
+            <div class="code-content">${this.generateCodeExample(node)}</div></div></div>`;
+
+        return html;
+    }
+
+    _buildFeatureExplorer(node) {
+        const types = [...new Set(node.features.map(f => f.type))].sort();
+        const typePills = types.map(t => `<span class="feat-type-pill" data-type="${t}">${t}</span>`).join('');
+
+        return `<div class="feature-explorer-header">
+            <div class="feature-explorer-title">
+                <span>⚡ Features</span>
+                <span class="feat-count">${node.features.length}</span>
             </div>
-        `;
-        
-        content.innerHTML = html;
-        panel.classList.add('open');
+            <div class="feature-search-bar">
+                <input class="feature-search-input" id="featSearchInput" placeholder="Search features, types, tags…" oninput="diagram._filterFeatures(this.value)">
+            </div>
+            <div class="feature-type-filters" id="featTypeFilters">
+                <span class="feat-type-pill active" data-type="all">All</span>
+                ${typePills}
+            </div>
+        </div>
+        <div class="feature-list-scroll" id="featListScroll">
+            ${node.features.map((f, i) => this._buildFeatureCard(f, i)).join('')}
+        </div>`;
+    }
+
+    _buildFeatureCard(f, idx) {
+        // Support both old format {name, type} and new rich format
+        const name = f.name || f;
+        const type = f.type || 'Unknown';
+        const desc = f.description || '';
+        const tags = f.tags || [];
+        const hasPii = f.security && f.security.pii;
+        const onlineServing = f.serving && f.serving.online;
+        const offlineServing = f.serving && f.serving.offline;
+        const hasRichData = f.description || f.tags || f.sourceColumn || f.transformation ||
+                            f.validation || f.serving || f.security || f.quality || f.statistics;
+
+        // Type color
+        const typeColors = { 'Int64':'#60a5fa','Int32':'#60a5fa','Float32':'#f59e0b','Float64':'#f59e0b',
+            'String':'#a78bfa','Bool':'#34d399','Bytes':'#fb923c','UnixTimestamp':'#f472b6' };
+        const dotColor = typeColors[type] || '#94a3b8';
+
+        let badges = '';
+        if (hasPii) badges += `<span class="feat-badge feat-badge-pii">PII</span>`;
+        if (onlineServing) badges += `<span class="feat-badge feat-badge-online">online</span>`;
+        if (offlineServing) badges += `<span class="feat-badge feat-badge-offline">offline</span>`;
+
+        let body = '';
+        if (hasRichData) {
+            body = `<div class="feat-card-body"><div class="feat-meta-grid">`;
+
+            // Core section
+            let coreRows = '';
+            if (f.sourceColumn) coreRows += `<div class="feat-meta-row"><span class="feat-meta-key">Source</span><span class="feat-meta-val">${f.sourceColumn}</span></div>`;
+            if (f.defaultValue !== undefined) coreRows += `<div class="feat-meta-row"><span class="feat-meta-key">Default</span><span class="feat-meta-val">${f.defaultValue}</span></div>`;
+            if (f.owner) coreRows += `<div class="feat-meta-row"><span class="feat-meta-key">Owner</span><span class="feat-meta-val">${f.owner}</span></div>`;
+            if (coreRows) body += `<div class="feat-meta-section"><div class="feat-meta-section-title">Core</div>${coreRows}</div>`;
+
+            // Transformation
+            if (f.transformation) {
+                body += `<div class="feat-meta-section"><div class="feat-meta-section-title">Transform</div>
+                    <div class="feat-meta-row"><span class="feat-meta-val code" title="${f.transformation}">${f.transformation}</span></div>
+                </div>`;
+            }
+
+            // Serving
+            if (f.serving) {
+                let servRows = '';
+                if (f.serving.online !== undefined) servRows += `<div class="feat-meta-row"><span class="feat-meta-key">Online</span><span class="feat-meta-val">${f.serving.online ? '✅' : '❌'}</span></div>`;
+                if (f.serving.offline !== undefined) servRows += `<div class="feat-meta-row"><span class="feat-meta-key">Offline</span><span class="feat-meta-val">${f.serving.offline ? '✅' : '❌'}</span></div>`;
+                if (f.serving.ttl) servRows += `<div class="feat-meta-row"><span class="feat-meta-key">TTL</span><span class="feat-meta-val">${f.serving.ttl}s</span></div>`;
+                if (servRows) body += `<div class="feat-meta-section"><div class="feat-meta-section-title">Serving</div>${servRows}</div>`;
+            }
+
+            // Validation
+            if (f.validation) {
+                let valRows = '';
+                if (f.validation.min !== undefined) valRows += `<div class="feat-meta-row"><span class="feat-meta-key">Min</span><span class="feat-meta-val">${f.validation.min}</span></div>`;
+                if (f.validation.max !== undefined) valRows += `<div class="feat-meta-row"><span class="feat-meta-key">Max</span><span class="feat-meta-val">${f.validation.max}</span></div>`;
+                if (f.validation.nullable !== undefined) valRows += `<div class="feat-meta-row"><span class="feat-meta-key">Nullable</span><span class="feat-meta-val">${f.validation.nullable ? 'Yes' : 'No'}</span></div>`;
+                if (valRows) body += `<div class="feat-meta-section"><div class="feat-meta-section-title">Validation</div>${valRows}</div>`;
+            }
+
+            // Security
+            if (f.security) {
+                let secRows = '';
+                if (f.security.pii !== undefined) secRows += `<div class="feat-meta-row"><span class="feat-meta-key">PII</span><span class="feat-meta-val">${f.security.pii ? '🔴 Yes' : 'No'}</span></div>`;
+                if (f.security.classification) secRows += `<div class="feat-meta-row"><span class="feat-meta-key">Class</span><span class="feat-meta-val">${f.security.classification}</span></div>`;
+                if (f.security.sensitive !== undefined) secRows += `<div class="feat-meta-row"><span class="feat-meta-key">Sensitive</span><span class="feat-meta-val">${f.security.sensitive ? 'Yes' : 'No'}</span></div>`;
+                if (secRows) body += `<div class="feat-meta-section"><div class="feat-meta-section-title">Security</div>${secRows}</div>`;
+            }
+
+            // Quality
+            if (f.quality) {
+                let qualRows = '';
+                if (f.quality.freshness) qualRows += `<div class="feat-meta-row"><span class="feat-meta-key">Freshness</span><span class="feat-meta-val">${f.quality.freshness}</span></div>`;
+                if (f.quality.completeness !== undefined) {
+                    qualRows += `<div class="feat-meta-row"><span class="feat-meta-key">Complete</span><span class="feat-meta-val">${f.quality.completeness}%</span></div>
+                    <div class="feat-stat-bar"><div class="feat-stat-fill" style="width:${f.quality.completeness}%"></div></div>`;
+                }
+                if (f.quality.accuracy !== undefined) qualRows += `<div class="feat-meta-row"><span class="feat-meta-key">Accuracy</span><span class="feat-meta-val">${f.quality.accuracy}%</span></div>`;
+                if (qualRows) body += `<div class="feat-meta-section"><div class="feat-meta-section-title">Quality</div>${qualRows}</div>`;
+            }
+
+            // Statistics
+            if (f.statistics) {
+                let statRows = '';
+                if (f.statistics.mean !== undefined) statRows += `<div class="feat-meta-row"><span class="feat-meta-key">Mean</span><span class="feat-meta-val">${f.statistics.mean}</span></div>`;
+                if (f.statistics.stdDev !== undefined) statRows += `<div class="feat-meta-row"><span class="feat-meta-key">Std Dev</span><span class="feat-meta-val">${f.statistics.stdDev}</span></div>`;
+                if (f.statistics.nullCount !== undefined) statRows += `<div class="feat-meta-row"><span class="feat-meta-key">Nulls</span><span class="feat-meta-val">${f.statistics.nullCount.toLocaleString()}</span></div>`;
+                if (f.statistics.distinctCount !== undefined) statRows += `<div class="feat-meta-row"><span class="feat-meta-key">Distinct</span><span class="feat-meta-val">${f.statistics.distinctCount.toLocaleString()}</span></div>`;
+                if (statRows) body += `<div class="feat-meta-section"><div class="feat-meta-section-title">Statistics</div>${statRows}</div>`;
+            }
+
+            // Tags
+            if (tags.length > 0) {
+                body += `<div class="feat-meta-section" style="grid-column:1/-1">
+                    <div class="feat-meta-section-title">Tags</div>
+                    <div class="feat-tags-list">${tags.map(t => `<span class="feat-tag-chip">#${t}</span>`).join('')}</div>
+                </div>`;
+            }
+
+            body += `</div></div>`;
+        }
+
+        return `<div class="feat-card" data-idx="${idx}" data-type="${type}" data-name="${name.toLowerCase()}" data-tags="${tags.join(',').toLowerCase()}"
+                     onclick="diagram._toggleFeatureCard(this)">
+            <div class="feat-card-header">
+                <div class="feat-type-dot" style="background:${dotColor}"></div>
+                <div class="feat-card-name">${name}</div>
+                <div class="feat-card-badges">${badges}</div>
+                <div class="feat-card-type">${type}</div>
+                ${hasRichData ? '<div class="feat-card-chevron">▼</div>' : ''}
+            </div>
+            ${desc ? `<div class="feat-card-desc">${desc}</div>` : ''}
+            ${body}
+        </div>`;
+    }
+
+    _toggleFeatureCard(el) {
+        el.classList.toggle('expanded');
+    }
+
+    _filterFeatures(query) {
+        const q = query.toLowerCase();
+        const activeType = document.querySelector('.feat-type-pill.active')?.dataset.type || 'all';
+        document.querySelectorAll('#featListScroll .feat-card').forEach(card => {
+            const nameMatch = card.dataset.name.includes(q);
+            const tagMatch = card.dataset.tags.includes(q);
+            const typeMatch = activeType === 'all' || card.dataset.type === activeType;
+            card.style.display = (nameMatch || tagMatch) && typeMatch ? '' : 'none';
+        });
+    }
+
+    _bindFeatureExplorer(node) {
+        const filters = document.getElementById('featTypeFilters');
+        if (!filters) return;
+        filters.addEventListener('click', e => {
+            const pill = e.target.closest('.feat-type-pill');
+            if (!pill) return;
+            filters.querySelectorAll('.feat-type-pill').forEach(p => p.classList.remove('active'));
+            pill.classList.add('active');
+            const q = document.getElementById('featSearchInput')?.value || '';
+            this._filterFeatures(q);
+        });
     }
 
     openModal(type, existingNode = null) {
@@ -3694,12 +3708,28 @@ class FeastDiagram {
         
         if (node.features && node.features.length > 0) {
             featuresDiv.style.display = 'block';
-            featureList.innerHTML = node.features.slice(0, 5).map(f => {
+            // Update title with count
+            const titleEl = document.getElementById('tooltipFeaturesTitle');
+            if (titleEl) titleEl.textContent = `Features (${node.features.length})`;
+            featureList.innerHTML = node.features.slice(0, 4).map(f => {
                 const name = typeof f === 'string' ? f : f.name;
-                return `<span class="tooltip-feature-tag">${name}</span>`;
+                const type = typeof f === 'string' ? '' : (f.type || '');
+                return `<span class="tooltip-feature-tag" title="${type}">${name}</span>`;
             }).join('');
-            if (node.features.length > 5) {
-                featureList.innerHTML += `<span style="color: var(--text-muted); font-size: 11px;">+${node.features.length - 5} more</span>`;
+            if (node.features.length > 4) {
+                featureList.innerHTML += `<span style="color: var(--text-muted); font-size: 11px;">+${node.features.length - 4} more</span>`;
+            }
+            // Rich metadata summary
+            const metaEl = document.getElementById('tooltipFeatureMeta');
+            if (metaEl) {
+                const piiCount = node.features.filter(f => f.security && f.security.pii).length;
+                const onlineCount = node.features.filter(f => f.serving && f.serving.online).length;
+                const types = [...new Set(node.features.map(f => f.type).filter(Boolean))];
+                let meta = '';
+                if (piiCount > 0) meta += `<span style="font-size:10px;padding:2px 6px;background:rgba(239,68,68,0.15);color:#f87171;border-radius:4px">🔒 ${piiCount} PII</span>`;
+                if (onlineCount > 0) meta += `<span style="font-size:10px;padding:2px 6px;background:rgba(16,185,129,0.12);color:#34d399;border-radius:4px">⚡ ${onlineCount} online</span>`;
+                if (types.length > 0) meta += `<span style="font-size:10px;padding:2px 6px;background:var(--bg-tertiary);color:var(--text-muted);border-radius:4px">${types.slice(0,3).join(', ')}${types.length>3?'…':''}</span>`;
+                metaEl.innerHTML = meta;
             }
         } else {
             featuresDiv.style.display = 'none';

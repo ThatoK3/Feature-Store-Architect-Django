@@ -227,13 +227,49 @@ function loadComplexExample(nodeManager, addConnection, autoLayout) {
         entities: [user],
         tags: ['profile', 'batch', 'pii'],
         features: [
-            { name: 'age', type: 'Int64' },
-            { name: 'country_code', type: 'String' },
-            { name: 'gender', type: 'String' },
-            { name: 'signup_date', type: 'String' },
-            { name: 'account_tier', type: 'String' },
-            { name: 'language_preference', type: 'String' },
-            { name: 'timezone', type: 'String' }
+            {
+                name: 'user_age', type: 'Int64',
+                description: 'User age derived from birth date',
+                tags: ['demographic', 'pii'],
+                owner: 'Platform Team',
+                sourceColumn: 'birth_date',
+                transformation: 'EXTRACT(YEAR FROM AGE(CURRENT_DATE, birth_date))',
+                defaultValue: '0',
+                validation: { min: 0, max: 150, nullable: false },
+                serving: { online: true, offline: true, ttl: 86400 },
+                security: { pii: true, sensitive: false, classification: 'internal' },
+                quality: { freshness: 'daily', completeness: 98.5, accuracy: 99.9 },
+                statistics: { mean: 34.5, stdDev: 12.3, nullCount: 120, distinctCount: 89 }
+            },
+            {
+                name: 'country_code', type: 'String',
+                description: 'ISO 3166-1 alpha-2 country code from registration',
+                tags: ['geographic'],
+                owner: 'Platform Team',
+                sourceColumn: 'registration_country',
+                defaultValue: 'US',
+                validation: { nullable: false },
+                serving: { online: true, offline: true, ttl: 86400 },
+                security: { pii: false, classification: 'public' },
+                quality: { freshness: 'daily', completeness: 99.8, accuracy: 99.5 },
+                statistics: { nullCount: 22, distinctCount: 195 }
+            },
+            {
+                name: 'account_tier', type: 'String',
+                description: 'Customer subscription tier level',
+                tags: ['billing', 'segmentation'],
+                owner: 'Growth Team',
+                sourceColumn: 'subscription_tier',
+                validation: { nullable: false },
+                serving: { online: true, offline: true, ttl: 3600 },
+                security: { pii: false, classification: 'internal' },
+                quality: { freshness: 'hourly', completeness: 100, accuracy: 99.99 },
+                statistics: { nullCount: 0, distinctCount: 4 }
+            },
+            { name: 'gender', type: 'String', description: 'Self-reported gender', tags: ['demographic','pii'], security: { pii: true }, serving: { online: false, offline: true } },
+            { name: 'signup_date', type: 'String', description: 'Account creation timestamp', tags: ['lifecycle'], serving: { online: true, offline: true } },
+            { name: 'language_preference', type: 'String', description: 'UI language setting', serving: { online: true, offline: false } },
+            { name: 'timezone', type: 'String', description: 'User local timezone', serving: { online: true, offline: false } }
         ],
         details: {
             ttl: '86400',
