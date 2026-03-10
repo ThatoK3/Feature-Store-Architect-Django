@@ -6231,6 +6231,104 @@ the registry, online store, and offline store settings.
     }
 
     // ===================================================
+    // NODE TYPE BROWSER (stats bar clicks)
+    // ===================================================
+
+    showNodesByType(type) {
+        const panel = document.getElementById('detailPanel');
+        const contentEl = document.getElementById('panelContent');
+
+        const typeConfig = {
+            datasource:  { label: 'Data Sources',   icon: '🗄️',  color: '#60a5fa', bg: 'rgba(59,130,246,0.15)'  },
+            entity:      { label: 'Entities',        icon: '🔑',  color: '#a78bfa', bg: 'rgba(139,92,246,0.15)'  },
+            featureview: { label: 'Feature Views',   icon: '📊',  color: '#34d399', bg: 'rgba(16,185,129,0.15)'  },
+            service:     { label: 'Feature Services',icon: '⚙️',  color: '#fb923c', bg: 'rgba(249,115,22,0.15)'  },
+        };
+        const cfg = typeConfig[type] || { label: type, icon: '📦', color: '#64748b', bg: 'rgba(100,116,139,0.15)' };
+
+        const nodes = [];
+        this.nodes.nodes.forEach((node, nodeId) => {
+            if (node.type === type) nodes.push({ node, nodeId });
+        });
+
+        // Switch to fb-mode header
+        const fbHeader = document.getElementById('panelFbHeader');
+        fbHeader.style.display = '';
+        fbHeader.querySelector('.panel-type-badge').style.background = cfg.bg;
+        fbHeader.querySelector('.panel-type-badge span:first-child').textContent = cfg.icon;
+        fbHeader.querySelector('.panel-type-badge span:last-child').style.color = cfg.color;
+        fbHeader.querySelector('.panel-type-badge span:last-child').textContent = cfg.label;
+        document.getElementById('panelFbCount').textContent = `${nodes.length} ${cfg.label}`;
+        fbHeader.querySelector('.panel-subtitle').textContent = `Click any item to inspect it in detail`;
+        document.getElementById('panelNodeHeader').style.display = 'none';
+
+        panel.classList.remove('wide');
+        panel.classList.add('fb-mode', 'open');
+
+        const cardsHtml = nodes.length > 0 ? nodes.map(({ node, nodeId }) => {
+            const subtitleParts = [];
+            if (node.subtype) subtitleParts.push(node.subtype);
+            if (node.features) subtitleParts.push(`${node.features.length} features`);
+            if (node.joinKey) subtitleParts.push(`join: ${node.joinKey}`);
+            if (node.kind) subtitleParts.push(node.kind);
+            const subtitle = subtitleParts.join(' · ');
+
+            const tags = (node.tags || []).map(t =>
+                `<span class="nb-tag">${t}</span>`
+            ).join('');
+
+            const desc = node.description
+                ? `<div class="nb-desc">${node.description}</div>` : '';
+
+            return `<div class="nb-card" onclick="diagram.selectNode('${nodeId}'); diagram.closePanel();">
+                <div class="nb-card-header">
+                    <div class="nb-icon" style="background:${cfg.bg};color:${cfg.color}">${cfg.icon}</div>
+                    <div class="nb-card-info">
+                        <div class="nb-name">${node.name || nodeId}</div>
+                        ${subtitle ? `<div class="nb-subtitle">${subtitle}</div>` : ''}
+                    </div>
+                    <div class="nb-arrow">→</div>
+                </div>
+                ${desc}
+                ${tags ? `<div class="nb-tags">${tags}</div>` : ''}
+            </div>`;
+        }).join('')
+        : `<div class="fb-empty"><div class="fb-empty-icon">${cfg.icon}</div><div class="fb-empty-msg">No ${cfg.label} in this diagram yet.</div></div>`;
+
+        contentEl.innerHTML = `<div class="nb-layout">
+            <div class="fb-search-bar">
+                <div class="fb-search-wrap">
+                    <span class="fb-search-icon">⌕</span>
+                    <input class="fb-search-input" id="nbSearchInput"
+                        placeholder="Search ${cfg.label}…"
+                        oninput="diagram._nbFilter()">
+                </div>
+                <div class="fb-stats" id="nbStats">${nodes.length} ${cfg.label.toLowerCase()}</div>
+            </div>
+            <div class="nb-list" id="nbList">${cardsHtml}</div>
+        </div>`;
+
+        // Store for filter
+        this._nbType = type;
+        this._nbNodes = nodes;
+        this._nbCfg = cfg;
+    }
+
+    _nbFilter() {
+        const q = (document.getElementById('nbSearchInput')?.value || '').toLowerCase();
+        const cards = document.querySelectorAll('#nbList .nb-card');
+        let visible = 0;
+        cards.forEach(card => {
+            const text = card.textContent.toLowerCase();
+            const show = !q || text.includes(q);
+            card.style.display = show ? '' : 'none';
+            if (show) visible++;
+        });
+        const stats = document.getElementById('nbStats');
+        if (stats) stats.textContent = `${visible} ${(this._nbCfg?.label || '').toLowerCase()}`;
+    }
+
+    // ===================================================
     // GLOBAL FEATURE BROWSER
     // ===================================================
 
