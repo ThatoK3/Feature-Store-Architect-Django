@@ -5865,9 +5865,13 @@ the registry, online store, and offline store settings.
 
         document.getElementById('fdmEditMode').style.display = 'none';
         document.getElementById('fdmViewMode').style.display = '';
-        document.getElementById('fdmEditBtn').textContent = '✏️ Edit';
 
-        document.getElementById('featureDetailModal').classList.add('active');
+
+	document.getElementById('fdmEditBtnIcon').textContent = '✏️';
+	document.getElementById('fdmEditBtnLabel').textContent = 'Edit';
+ 	document.getElementById('fdmEditBtn').classList.remove('active');
+        
+	document.getElementById('featureDetailModal').classList.add('active');
     }
 
     _closeFeatureModal() {
