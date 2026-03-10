@@ -1341,31 +1341,10 @@ class FeastDiagram {
     /**
      * Export repository to JSON file
      */
-    async export() {
-        // If we have a repo ID, try backend export endpoint
-        if (this.repoSettings.id) {
-            try {
-                const response = await fetch(`${this.api.baseUrl}/repositories/${this.repoSettings.id}/export_json/?include_hash=true`);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const data = await response.json();
-                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `${data.repository.name}-${new Date().toISOString().split('T')[0]}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
-                this.showNotification('Exported', 'Architecture exported from server');
-                return;
-            } catch (error) {
-                console.error('Backend export failed, falling back to local:', error);
-                // Fall through to local export
-            }
-        }
-        // Local export fallback
+    export() {
         const data = {
             repository: this.repoSettings,
-            nodes: Array.from(this.nodes.nodes.entries()),
+            nodes: Object.fromEntries(this.nodes.nodes.entries()),
             edges: this.nodes.edges,
             exportDate: new Date().toISOString(),
             version: '3.0'
@@ -1374,8 +1353,11 @@ class FeastDiagram {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${this.repoSettings.name}-${new Date().toISOString().split('T')[0]}.json`;
+        const filename = (this.repoSettings.name || 'feast-architecture').replace(/[^a-z0-9]/gi, '-');
+        a.download = `${filename}-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
         URL.revokeObjectURL(url);
         this.showNotification('Exported', 'Architecture saved to JSON file');
     }
@@ -1519,7 +1501,8 @@ class FeastDiagram {
         } else {
             panel.classList.add('open');
             this.edgeManagerOpen = true;
-            this.renderEdgeManager();
+            // Small delay to let DOM settle
+            setTimeout(() => this.renderEdgeManager(), 50);
         }
     }
 
@@ -3184,6 +3167,12 @@ class FeastDiagram {
         const edgeList = document.getElementById('edgeList');
         const fromSelect = document.getElementById('edgeFromSelect');
         const toSelect = document.getElementById('edgeToSelect');
+        
+        // Guard: DOM elements may not exist yet
+        if (!edgeList || !fromSelect || !toSelect) {
+            console.warn('renderEdgeManager: panel DOM not ready');
+            return;
+        }
         
         const totalEdges = this.nodes.edges.length;
         const validEdges = this.nodes.edges.filter(e => this.nodes.nodes.has(e.from) && this.nodes.nodes.has(e.to)).length;
