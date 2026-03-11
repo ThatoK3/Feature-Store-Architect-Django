@@ -1943,6 +1943,42 @@ class FeastDiagram {
 
     _buildFeatureExplorer(node, nodeId) {
 
+        // Service nodes store FV IDs in features — render as FV name cards
+        if (node.type === 'service') {
+            const fvIds = node.features || [];
+            let listHtml;
+            if (fvIds.length === 0) {
+                listHtml = `<div class="feat-empty-state">
+                    <div class="feat-empty-icon">⚙️</div>
+                    <div class="feat-empty-msg">No feature views linked</div>
+                </div>`;
+            } else {
+                listHtml = fvIds.map(fvId => {
+                    const fv = this.nodes.nodes.get(fvId);
+                    if (!fv) return '';
+                    const subtypeColor = this.getSubtypeColor(fv.subtype);
+                    return `<div class="feat-card" onclick="diagram.selectNode('${fvId}')">
+                        <div class="feat-card-header">
+                            <div class="feat-type-dot" style="background:#10b981"></div>
+                            <div class="feat-card-main">
+                                <div class="feat-card-name">${fv.name}</div>
+                                <div class="feat-card-subdesc">${fv.features ? fv.features.length : 0} features</div>
+                            </div>
+                            <span class="feat-card-type" style="color:${subtypeColor}">${fv.subtype || ''}</span>
+                            <div class="feat-card-arrow">›</div>
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+            return `<div class="feature-explorer-header">
+                <div class="feature-explorer-title">
+                    <span>⚙️ Feature Views</span>
+                    <span class="feat-count">${fvIds.length}</span>
+                </div>
+            </div>
+            <div class="feature-list-scroll" id="featListScroll">${listHtml}</div>`;
+        }
+
         const features = node.features || [];
         const types = [...new Set(features.map(f => f.type).filter(Boolean))].sort();
         const typePills = types.map(t => `<span class="feat-type-pill" data-type="${t}">${t}</span>`).join('');
