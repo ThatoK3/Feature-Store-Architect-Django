@@ -2595,13 +2595,13 @@
         ══════════════════════════════════════════ */
         .llm-panel {
             position: fixed;
-            bottom: 90px;
+            bottom: 140px;
             left: 50%;
             transform: translateX(-50%) translateY(16px);
-            width: 620px;
+            width: 775px;
             min-width: 400px;
             max-width: 92vw;
-            height: 620px;
+            height: 775px;
             min-height: 140px;
             max-height: 85vh;
             background: var(--bg-secondary);
