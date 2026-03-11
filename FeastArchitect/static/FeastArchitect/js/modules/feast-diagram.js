@@ -1473,15 +1473,85 @@ class FeastDiagram {
     toggleLLMHelper() {
         const panel = document.getElementById('llmPanel');
         const isOpen = panel.classList.contains('open');
-        
         if (isOpen) {
             panel.classList.remove('open');
             this.llmPanelOpen = false;
         } else {
+            panel.classList.remove('minimized');
             panel.classList.add('open');
             this.llmPanelOpen = true;
             this.updateLLMContext();
+            this._initLLMPanel(panel);
         }
+    }
+
+    minimizeLLM() {
+        const panel = document.getElementById('llmPanel');
+        panel.classList.toggle('minimized');
+    }
+
+    _llmAutoResize(el) {
+        el.style.height = 'auto';
+        el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+    }
+
+    _initLLMPanel(panel) {
+        if (panel._llmInited) return;
+        panel._llmInited = true;
+
+        // ── Drag to move ──────────────────────────────────────────
+        const header = document.getElementById('llmHeaderDrag');
+        let dragging = false, startX, startY, startLeft, startBottom;
+
+        header.addEventListener('mousedown', e => {
+            if (e.target.closest('button')) return;
+            dragging = true;
+            // Switch from transform-centered to absolute positioning
+            const rect = panel.getBoundingClientRect();
+            panel.style.left = rect.left + 'px';
+            panel.style.bottom = (window.innerHeight - rect.bottom) + 'px';
+            panel.style.transform = 'none';
+            startX = e.clientX; startY = e.clientY;
+            startLeft = rect.left; startBottom = window.innerHeight - rect.bottom;
+            document.body.style.userSelect = 'none';
+        });
+
+        document.addEventListener('mousemove', e => {
+            if (!dragging) return;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            panel.style.left = Math.max(0, Math.min(window.innerWidth - panel.offsetWidth, startLeft + dx)) + 'px';
+            panel.style.bottom = Math.max(0, Math.min(window.innerHeight - 52, startBottom - dy)) + 'px';
+        });
+
+        document.addEventListener('mouseup', () => {
+            dragging = false;
+            document.body.style.userSelect = '';
+        });
+
+        // ── Resize from top edge ──────────────────────────────────
+        const resizeHandle = document.getElementById('llmResizeHandle');
+        let resizing = false, startH, startClientY;
+
+        resizeHandle.addEventListener('mousedown', e => {
+            resizing = true;
+            startH = panel.offsetHeight;
+            startClientY = e.clientY;
+            document.body.style.userSelect = 'none';
+            e.stopPropagation();
+        });
+
+        document.addEventListener('mousemove', e => {
+            if (!resizing) return;
+            const dy = startClientY - e.clientY;
+            const newH = Math.max(200, Math.min(window.innerHeight * 0.85, startH + dy));
+            panel.style.height = newH + 'px';
+        });
+
+        document.addEventListener('mouseup', () => {
+            resizing = false;
+            document.body.style.userSelect = '';
+        });
     }
 
     toggleDjangoAdmin() {
@@ -3627,6 +3697,15 @@ class FeastDiagram {
 
     updateLLMContext() {
         const container = document.getElementById('llmContextContent');
+        const iconEl = container ? container.querySelector('.llm-context-icon') : null;
+        const textEl = container ? container.querySelector('.llm-context-text') : null;
+        if (!iconEl || !textEl) {
+            // Fallback if old DOM
+            if (!container) return;
+        }
+        const setText = (icon, text) => {
+            if (iconEl) { iconEl.textContent = icon; textEl.textContent = text; }
+        };
         
         if (!this.selectedNode) {
             const stats = {
@@ -3638,24 +3717,7 @@ class FeastDiagram {
                 services: Array.from(this.nodes.nodes.values()).filter(n => n.type === 'service').length
             };
             
-            container.innerHTML = `
-                <div class="llm-context-item">
-                    <span>📊</span>
-                    <span>Architecture Overview: ${stats.nodes} components</span>
-                </div>
-                <div class="llm-context-item">
-                    <span>🔗</span>
-                    <span>${stats.edges} connections</span>
-                </div>
-                <div class="llm-context-item">
-                    <span>🗄️</span>
-                    <span>${stats.sources} sources, ${stats.entities} entities</span>
-                </div>
-                <div class="llm-context-item">
-                    <span>⚡</span>
-                    <span>${stats.views} views, ${stats.services} services</span>
-                </div>
-            `;
+            setText('📊', `${stats.nodes} components · ${stats.views} views · ${stats.services} services`);
         } else {
             const node = this.nodes.nodes.get(this.selectedNode);
             const config = this.config.colors[node.type];
@@ -3665,30 +3727,10 @@ class FeastDiagram {
                 icon = node.dbType.icon;
             }
             
-            container.innerHTML = `
-                <div class="llm-context-item">
-                    <span>${icon}</span>
-                    <span><strong>${node.name}</strong> (${config.label})</span>
-                </div>
-                ${node.description ? `
-                <div class="llm-context-item">
-                    <span>📝</span>
-                    <span>${node.description.substring(0, 60)}${node.description.length > 60 ? '...' : ''}</span>
-                </div>
-                ` : ''}
-                ${node.features ? `
-                <div class="llm-context-item">
-                    <span>⚡</span>
-                    <span>${node.features.length} features</span>
-                </div>
-                ` : ''}
-                ${node.entities ? `
-                <div class="llm-context-item">
-                    <span>👤</span>
-                    <span>${node.entities.length} entities</span>
-                </div>
-                ` : ''}
-            `;
+            const extras = [];
+            if (node.features && node.type === 'featureview') extras.push(`${node.features.length} features`);
+            if (node.entities) extras.push(`${node.entities.length} entities`);
+            setText(icon, `${node.name} · ${config.label}${extras.length ? ' · ' + extras.join(' · ') : ''}`);
         }
     }
 
