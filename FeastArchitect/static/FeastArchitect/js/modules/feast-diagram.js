@@ -1492,12 +1492,22 @@ class FeastDiagram {
 
     _llmAutoResize(el) {
         el.style.height = 'auto';
-        el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+        el.style.height = Math.min(el.scrollHeight, 200) + 'px';
     }
 
     _initLLMPanel(panel) {
         if (panel._llmInited) return;
         panel._llmInited = true;
+
+        // ── Anchor panel to absolute position ────────────────────
+        const anchorPanel = () => {
+            if (panel.style.transform !== 'none') {
+                const rect = panel.getBoundingClientRect();
+                panel.style.left   = rect.left + 'px';
+                panel.style.bottom = (window.innerHeight - rect.bottom) + 'px';
+                panel.style.transform = 'none';
+            }
+        };
 
         // ── Drag to move ──────────────────────────────────────────
         const header = document.getElementById('llmHeaderDrag');
@@ -1505,23 +1515,18 @@ class FeastDiagram {
 
         header.addEventListener('mousedown', e => {
             if (e.target.closest('button')) return;
+            anchorPanel();
             dragging = true;
-            // Switch from transform-centered to absolute positioning
-            const rect = panel.getBoundingClientRect();
-            panel.style.left = rect.left + 'px';
-            panel.style.bottom = (window.innerHeight - rect.bottom) + 'px';
-            panel.style.transform = 'none';
             startX = e.clientX; startY = e.clientY;
-            startLeft = rect.left; startBottom = window.innerHeight - rect.bottom;
+            startLeft = parseFloat(panel.style.left);
+            startBottom = parseFloat(panel.style.bottom);
             document.body.style.userSelect = 'none';
         });
 
         document.addEventListener('mousemove', e => {
             if (!dragging) return;
-            const dx = e.clientX - startX;
-            const dy = e.clientY - startY;
-            panel.style.left = Math.max(0, Math.min(window.innerWidth - panel.offsetWidth, startLeft + dx)) + 'px';
-            panel.style.bottom = Math.max(0, Math.min(window.innerHeight - 52, startBottom - dy)) + 'px';
+            panel.style.left   = Math.max(0, Math.min(window.innerWidth  - panel.offsetWidth,  startLeft   + (e.clientX - startX))) + 'px';
+            panel.style.bottom = Math.max(0, Math.min(window.innerHeight - 52,                 startBottom - (e.clientY - startY))) + 'px';
         });
 
         document.addEventListener('mouseup', () => {
@@ -1529,23 +1534,48 @@ class FeastDiagram {
             document.body.style.userSelect = '';
         });
 
-        // ── Resize from top edge ──────────────────────────────────
-        const resizeHandle = document.getElementById('llmResizeHandle');
-        let resizing = false, startH, startClientY;
+        // ── Multi-edge resize ─────────────────────────────────────
+        let resizing = false, resizeDir = '';
+        let rStartX, rStartY, rStartW, rStartH, rStartLeft, rStartBottom;
 
-        resizeHandle.addEventListener('mousedown', e => {
-            resizing = true;
-            startH = panel.offsetHeight;
-            startClientY = e.clientY;
+        const startResize = (e, dir) => {
+            anchorPanel();
+            resizing = true; resizeDir = dir;
+            rStartX = e.clientX; rStartY = e.clientY;
+            rStartW = panel.offsetWidth; rStartH = panel.offsetHeight;
+            rStartLeft   = parseFloat(panel.style.left);
+            rStartBottom = parseFloat(panel.style.bottom);
             document.body.style.userSelect = 'none';
             e.stopPropagation();
-        });
+            e.preventDefault();
+        };
+
+        const maxH = () => window.innerHeight * 0.88;
+        const minW = 400, minH = 200;
+
+        document.getElementById('llmResizeN') .addEventListener('mousedown', e => startResize(e, 'n'));
+        document.getElementById('llmResizeE') .addEventListener('mousedown', e => startResize(e, 'e'));
+        document.getElementById('llmResizeW') .addEventListener('mousedown', e => startResize(e, 'w'));
+        document.getElementById('llmResizeNE').addEventListener('mousedown', e => startResize(e, 'ne'));
+        document.getElementById('llmResizeNW').addEventListener('mousedown', e => startResize(e, 'nw'));
 
         document.addEventListener('mousemove', e => {
             if (!resizing) return;
-            const dy = startClientY - e.clientY;
-            const newH = Math.max(200, Math.min(window.innerHeight * 0.85, startH + dy));
-            panel.style.height = newH + 'px';
+            const dx = e.clientX - rStartX;
+            const dy = e.clientY - rStartY;
+
+            if (resizeDir.includes('n')) {
+                const newH = Math.max(minH, Math.min(maxH(), rStartH - dy));
+                panel.style.height = newH + 'px';
+            }
+            if (resizeDir.includes('e')) {
+                panel.style.width = Math.max(minW, Math.min(window.innerWidth * 0.9, rStartW + dx)) + 'px';
+            }
+            if (resizeDir.includes('w')) {
+                const newW = Math.max(minW, Math.min(window.innerWidth * 0.9, rStartW - dx));
+                panel.style.width = newW + 'px';
+                panel.style.left  = (rStartLeft + (rStartW - newW)) + 'px';
+            }
         });
 
         document.addEventListener('mouseup', () => {

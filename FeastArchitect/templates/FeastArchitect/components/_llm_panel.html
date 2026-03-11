@@ -1,18 +1,29 @@
 <div class="llm-panel" id="llmPanel">
-    <!-- Resize handle (top edge) -->
-    <div class="llm-resize-handle" id="llmResizeHandle"></div>
 
+    <!-- Resize handles -->
+    <div class="llm-resize-n"  id="llmResizeN"></div>
+    <div class="llm-resize-e"  id="llmResizeE"></div>
+    <div class="llm-resize-w"  id="llmResizeW"></div>
+    <div class="llm-resize-ne" id="llmResizeNE"></div>
+    <div class="llm-resize-nw" id="llmResizeNW"></div>
+
+    <!-- Header -->
     <div class="llm-header" id="llmHeaderDrag">
         <div class="llm-title">
             <div class="llm-title-dot"></div>
             <span>AI Assistant</span>
         </div>
         <div class="llm-header-actions">
-            <button class="llm-icon-btn" id="llmMinimizeBtn" onclick="diagram.minimizeLLM()" title="Minimize">─</button>
-            <button class="llm-icon-btn" onclick="diagram.toggleLLMHelper()" title="Close">✕</button>
+            <button class="llm-icon-btn" id="llmMinimizeBtn" onclick="diagram.minimizeLLM()" title="Minimize">
+                <svg width="12" height="2" viewBox="0 0 12 2" fill="currentColor"><rect width="12" height="2" rx="1"/></svg>
+            </button>
+            <button class="llm-icon-btn" onclick="diagram.toggleLLMHelper()" title="Close">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M1 1l8 8M9 1l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
         </div>
     </div>
 
+    <!-- Body -->
     <div class="llm-body" id="llmBody">
         <!-- Context chip -->
         <div class="llm-context-bar" id="llmContextContent">
@@ -45,16 +56,19 @@
 
         <!-- Input -->
         <div class="llm-input-area">
-            <textarea class="llm-input" id="llmInput"
-                placeholder="Ask anything about your feature store…"
-                rows="1"
-                oninput="diagram._llmAutoResize(this)"
-                onkeydown="if((event.metaKey||event.ctrlKey)&&event.key==='Enter'){diagram.sendLLMMessage();event.preventDefault()}"></textarea>
+            <div class="llm-input-wrap">
+                <textarea class="llm-input" id="llmInput"
+                    placeholder="Ask anything about your feature store…"
+                    oninput="diagram._llmAutoResize(this)"
+                    onkeydown="if((event.metaKey||event.ctrlKey)&&event.key==='Enter'){diagram.sendLLMMessage();event.preventDefault()}"></textarea>
+            </div>
             <div class="llm-input-footer">
                 <span class="llm-hint">⌘↵ to send</span>
                 <button class="llm-send-btn" onclick="diagram.sendLLMMessage()">
                     <span>Send</span>
-                    <span class="llm-send-arrow">↑</span>
+                    <svg class="llm-send-arrow" width="14" height="14" viewBox="0 0 14 14" fill="none">
+                        <path d="M7 12V2M7 2L3 6M7 2l4 4" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
                 </button>
             </div>
         </div>
@@ -66,6 +80,11 @@
             <div class="llm-title-dot"></div>
             <span>AI Assistant</span>
         </div>
-        <span class="llm-minimized-hint">Click to expand</span>
+        <div style="display:flex;align-items:center;gap:10px">
+            <span class="llm-minimized-hint">Click to expand</span>
+            <button class="llm-icon-btn" onclick="event.stopPropagation();diagram.toggleLLMHelper()" title="Close" style="opacity:0.6">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M1 1l8 8M9 1l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
+        </div>
     </div>
 </div>
