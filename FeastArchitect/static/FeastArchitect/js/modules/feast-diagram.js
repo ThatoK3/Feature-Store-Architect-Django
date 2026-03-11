@@ -357,6 +357,7 @@ class FeastDiagram {
         const config = this.config.colors[node.type];
         const isSelected = this.selectedNode === node.id;
         const isHovered = this.hoveredNode === node.id;
+        const isFeatureHighlighted = this._featureHighlightIds && this._featureHighlightIds.has(node.id);
         
         const width = this.config.nodeWidth;
         const height = this.config.nodeHeight;
@@ -364,6 +365,9 @@ class FeastDiagram {
         if (isSelected) {
             this.ctx.shadowColor = config.bg;
             this.ctx.shadowBlur = 30;
+        } else if (isFeatureHighlighted) {
+            this.ctx.shadowColor = '#f59e0b';
+            this.ctx.shadowBlur = 25;
         } else if (isHovered) {
             this.ctx.shadowColor = config.bg;
             this.ctx.shadowBlur = 15;
@@ -378,8 +382,8 @@ class FeastDiagram {
         this.roundRect(node.x, node.y, width, height, 12);
         this.ctx.fill();
         
-        this.ctx.strokeStyle = isSelected ? config.bg : getComputedStyle(document.body).getPropertyValue('--border-color').trim();
-        this.ctx.lineWidth = isSelected ? 3 : 1;
+        this.ctx.strokeStyle = isSelected ? config.bg : isFeatureHighlighted ? '#f59e0b' : getComputedStyle(document.body).getPropertyValue('--border-color').trim();
+        this.ctx.lineWidth = isSelected ? 3 : isFeatureHighlighted ? 2 : 1;
         this.ctx.stroke();
         
         this.ctx.shadowBlur = 0;
@@ -1707,31 +1711,9 @@ class FeastDiagram {
 
         this._setupPanelForNode(node);
         const contentEl = document.getElementById('panelContent');
-        panel.classList.add('wide');
-        contentEl.innerHTML = `
-            <div class="panel-wide-layout">
-                <div class="panel-left-col" id="panelLeftCol"></div>
-                <div class="panel-right-col" id="panelRightCol"></div>
-            </div>`;
-
-        document.getElementById('panelLeftCol').innerHTML = this._buildNodeDetails(id, node, config, icon);
-
-        // Right column: always show features for FV/FS; schema for datasource; relationships for entity
-        const rightEl = document.getElementById('panelRightCol');
-        if (node.type === 'featureview' || (node.type === 'service' && node.features && node.features.length > 0)) {
-            rightEl.innerHTML = this._buildFeatureExplorer(node, id);
-            this._bindFeatureExplorer(node, id);
-        } else if (node.type === 'datasource') {
-            rightEl.innerHTML = this._buildDatasourceRight(node, id);
-        } else if (node.type === 'entity') {
-            rightEl.innerHTML = this._buildEntityRight(node, id);
-        } else {
-            rightEl.innerHTML = `<div class="panel-right-empty">
-                <div class="panel-right-empty-icon">${icon}</div>
-                <div class="panel-right-empty-msg">No additional details</div>
-            </div>`;
-        }
-
+        panel.classList.remove('wide');
+        contentEl.innerHTML = this._buildSingleColPanel(id, node, config, icon);
+        this._bindFeatureExplorer(node, id);
         panel.classList.add('open');
     }
 
@@ -1944,7 +1926,183 @@ class FeastDiagram {
         return html;
     }
 
-    _buildFeatureExplorer(node, nodeId) {
+    _buildSingleColPanel(id, node, config, icon) {
+        let html = '<div class="sc-panel">';
+
+        // ── Description ──────────────────────────────────────────
+        if (node.description) {
+            html += `<div class="sc-section">
+                <div class="sc-section-title">Description</div>
+                <div class="sc-desc">${node.description}</div>
+            </div>`;
+        }
+
+        // ── Type-specific details ─────────────────────────────────
+        html += '<div class="sc-section"><div class="sc-detail-grid">';
+
+        if (node.type === 'entity') {
+            html += `
+                <div class="sc-detail-row"><span class="sc-label">Join Key</span><span class="sc-value sc-mono highlight">${node.joinKey}</span></div>
+                <div class="sc-detail-row"><span class="sc-label">Used By</span><span class="sc-value">${this.getUsedByCount(id)} views</span></div>`;
+        } else if (node.type === 'featureview') {
+            html += `
+                <div class="sc-detail-row"><span class="sc-label">Subtype</span><span class="sc-value" style="color:${this.getSubtypeColor(node.subtype)}">${node.subtype}</span></div>
+                <div class="sc-detail-row"><span class="sc-label">Entities</span><span class="sc-value">${node.entities ? node.entities.length : 0}</span></div>
+                <div class="sc-detail-row"><span class="sc-label">Features</span><span class="sc-value">${node.features ? node.features.length : 0}</span></div>
+                <div class="sc-detail-row"><span class="sc-label">TTL</span><span class="sc-value">${node.details && node.details.ttl ? node.details.ttl + 's' : 'Not set'}</span></div>`;
+        } else if (node.type === 'service') {
+            html += `
+                <div class="sc-detail-row"><span class="sc-label">Feature Views</span><span class="sc-value">${node.features ? node.features.length : 0}</span></div>
+                ${node.featureServices && node.featureServices.length > 0 ? `<div class="sc-detail-row"><span class="sc-label">Feature Services</span><span class="sc-value">${node.featureServices.length}</span></div>` : ''}
+                <div class="sc-detail-row"><span class="sc-label">Used By</span><span class="sc-value">${node.details && node.details.usedBy ? node.details.usedBy.length : 0} apps</span></div>`;
+        } else if (node.type === 'datasource') {
+            const dbName = node.dbType ? node.dbType.name : (node.kind || 'Unknown');
+            html += `
+                <div class="sc-detail-row"><span class="sc-label">Type</span><span class="sc-value">${dbName}</span></div>
+                <div class="sc-detail-row"><span class="sc-label">Category</span><span class="sc-value">${node.dbType ? node.dbType.category : 'Unknown'}</span></div>
+                <div class="sc-detail-row"><span class="sc-label">Debezium</span><span class="sc-value">${node.debeziumAvailable ? '✅ Yes' : '❌ No'}</span></div>
+                <div class="sc-detail-row"><span class="sc-label">Owned By</span><span class="sc-value">${node.ownedBy || '—'}</span></div>`;
+        }
+        html += '</div></div>';
+
+        // ── Access Process (datasource) ───────────────────────────
+        if (node.type === 'datasource' && node.accessProcess) {
+            html += `<div class="sc-section">
+                <div class="sc-section-title">Access Process</div>
+                <div class="sc-desc">${node.accessProcess}</div>
+                <button class="sc-access-btn" onclick="diagram.requestAccess('${id}')">🔐 Request Access</button>
+            </div>`;
+        }
+
+        // ── Schema (datasource) ───────────────────────────────────
+        if (node.type === 'datasource') {
+            const cols = node.columns || node.schema || [];
+            html += `<div class="sc-section">
+                <div class="sc-section-title">Schema ${cols.length > 0 ? `<span class="sc-count">${cols.length}</span>` : ''}</div>
+                <div class="sc-list">`;
+            if (cols.length > 0) {
+                html += cols.map((c, i) => {
+                    const cname = typeof c === 'string' ? c : (c.name || c.column || '');
+                    const ctype = typeof c === 'string' ? '' : (c.type || c.dataType || '');
+                    const pk = c.primaryKey ? '<span class="sc-badge sc-badge-pk">PK</span>' : '';
+                    return `<div class="sc-list-row" onmouseenter="diagram._showColPopover('${id}', ${i}, this)" onmouseleave="diagram._hideFeatPopover()">
+                        <span class="sc-dot" style="background:#64748b"></span>
+                        <span class="sc-col-name">${cname}</span>${pk}
+                        <span class="sc-col-type">${ctype}</span>
+                    </div>`;
+                }).join('');
+            } else {
+                html += '<div class="sc-empty">No schema defined</div>';
+            }
+            html += '</div></div>';
+        }
+
+        // ── Used-by Feature Views (entity) ────────────────────────
+        if (node.type === 'entity') {
+            const usedBy = [];
+            this.nodes.nodes.forEach((n, nid) => {
+                if (n.type === 'featureview' && n.entities && n.entities.includes(id)) usedBy.push({ id: nid, node: n });
+            });
+            html += `<div class="sc-section">
+                <div class="sc-section-title">Used by Feature Views ${usedBy.length > 0 ? `<span class="sc-count">${usedBy.length}</span>` : ''}</div>
+                <div class="sc-list">`;
+            if (usedBy.length > 0) {
+                html += usedBy.map(({ id: fvId, node: fv }) => `
+                    <div class="sc-list-row sc-clickable" onclick="diagram.selectNode('${fvId}')">
+                        <span class="sc-dot" style="background:#10b981"></span>
+                        <span class="sc-col-name">${fv.name}</span>
+                        <span class="sc-col-type">${fv.subtype} · ${fv.features.length} features</span>
+                        <span class="sc-arrow">→</span>
+                    </div>`).join('');
+            } else {
+                html += '<div class="sc-empty">Not used by any feature views</div>';
+            }
+            html += '</div></div>';
+        }
+
+        // ── Features (featureview / service) ─────────────────────
+        if (node.type === 'featureview' || node.type === 'service') {
+            const features = node.type === 'featureview' ? (node.features || []) : [];
+            const fvRefs = node.type === 'service' ? (node.features || []) : [];
+            const types = [...new Set(features.map(f => f.type).filter(Boolean))].sort();
+            const typePills = types.map(t => `<span class="feat-type-pill" data-type="${t}">${t}</span>`).join('');
+
+            html += `<div class="sc-section sc-features-section">
+                <div class="sc-features-header">
+                    <div class="sc-section-title">Features ${features.length > 0 ? `<span class="sc-count">${features.length}</span>` : ''}</div>
+                    ${node.type === 'featureview' ? `<button class="sc-edit-btn" onclick="diagram.showEditModal('${id}')" title="Edit features">✏️ Edit</button>` : ''}
+                </div>
+                ${features.length > 0 ? `<div class="sc-feat-search-row">
+                    <input class="feature-search-input" id="featSearchInput" placeholder="Search features…" oninput="diagram._filterFeatures(this.value)">
+                </div>` : ''}
+                ${types.length > 0 ? `<div class="feature-type-filters" id="featTypeFilters">
+                    <span class="feat-type-pill active" data-type="all">All</span>${typePills}
+                </div>` : '<div id="featTypeFilters"></div>'}
+                <div class="sc-feat-list" id="featListScroll">`;
+
+            if (features.length === 0 && fvRefs.length === 0) {
+                html += `<div class="sc-empty">No features defined yet.<br><button class="sc-link-btn" onclick="diagram.showEditModal('${id}')">+ Add Features</button></div>`;
+            } else if (node.type === 'service' && fvRefs.length > 0) {
+                // Service: show linked FV names
+                html += fvRefs.map(fvId => {
+                    const fv = this.nodes.nodes.get(fvId);
+                    if (!fv) return '';
+                    return `<div class="sc-list-row sc-clickable" onclick="diagram.selectNode('${fvId}')">
+                        <span class="sc-dot" style="background:#10b981"></span>
+                        <span class="sc-col-name">${fv.name}</span>
+                        <span class="sc-col-type">${fv.features ? fv.features.length : 0} features</span>
+                        <span class="sc-arrow">→</span>
+                    </div>`;
+                }).join('');
+            } else {
+                html += features.map((f, i) => this._buildFeatureCard(f, i, id)).join('');
+            }
+            html += '</div></div>';
+        }
+
+        // ── Lineage ───────────────────────────────────────────────
+        html += `<div class="sc-section"><div class="sc-section-title">Lineage</div><div class="sc-lineage">`;
+        node.inputs.forEach(inputId => {
+            const inp = this.nodes.nodes.get(inputId);
+            if (!inp || !this.isNodeVisible(inp)) return;
+            const ic = this.config.colors[inp.type];
+            const ii = (inp.type === 'datasource' && inp.dbType) ? inp.dbType.icon : ic.icon;
+            html += `<div class="sc-lineage-node sc-clickable" onclick="diagram.selectNode('${inputId}')">
+                <div class="sc-lineage-icon" style="background:${ic.bg}20;color:${ic.light}">${ii}</div>
+                <div class="sc-lineage-info"><div class="sc-lineage-name">${inp.name}</div><div class="sc-lineage-type">${ic.label}</div></div>
+                <span class="sc-lineage-arrow">↑</span></div>`;
+        });
+        html += `<div class="sc-lineage-node sc-lineage-self" style="border-color:${config.light}30;background:${config.bg}15">
+            <div class="sc-lineage-icon" style="background:${config.bg}30;color:${config.light}">${icon}</div>
+            <div class="sc-lineage-info"><div class="sc-lineage-name">${node.name}</div><div class="sc-lineage-type" style="color:${config.light}">${config.label}</div></div>
+        </div>`;
+        node.outputs.forEach(outputId => {
+            const out = this.nodes.nodes.get(outputId);
+            if (!out || !this.isNodeVisible(out)) return;
+            const oc = this.config.colors[out.type];
+            const oi = (out.type === 'datasource' && out.dbType) ? out.dbType.icon : oc.icon;
+            html += `<div class="sc-lineage-node sc-clickable" onclick="diagram.selectNode('${outputId}')">
+                <div class="sc-lineage-icon" style="background:${oc.bg}20;color:${oc.light}">${oi}</div>
+                <div class="sc-lineage-info"><div class="sc-lineage-name">${out.name}</div><div class="sc-lineage-type">${oc.label}</div></div>
+                <span class="sc-lineage-arrow">↓</span></div>`;
+        });
+        html += '</div></div>';
+
+        // ── Notes ─────────────────────────────────────────────────
+        if (node.details && node.details.notes) {
+            html += `<div class="sc-section"><div class="sc-section-title">Notes</div><div class="sc-desc">${node.details.notes}</div></div>`;
+        }
+
+        // ── Python API ────────────────────────────────────────────
+        html += `<div class="sc-section"><div class="sc-section-title">Python API</div>
+            <div class="code-block"><div class="code-header"><span class="code-lang">Python</span><button class="code-copy" onclick="diagram.copyCode(this)">Copy</button></div>
+            <div class="code-content">${this.generateCodeExample(node)}</div></div></div>`;
+
+        html += '</div>';
+        return html;
+    }
+
+        _buildFeatureExplorer(node, nodeId) {
         const features = node.features || [];
         const types = [...new Set(features.map(f => f.type).filter(Boolean))].sort();
         const typePills = types.map(t => `<span class="feat-type-pill" data-type="${t}">${t}</span>`).join('');
@@ -2008,18 +2166,17 @@ class FeastDiagram {
                      data-idx="${idx}" data-nodeid="${nodeId}"
                      data-type="${type}" data-name="${name.toLowerCase()}"
                      data-tags="${tags.join(',').toLowerCase()}"
-                     onclick="diagram._openFeatureModal('${nodeId}', ${idx})"
                      onmouseenter="diagram._showFeatPopover('${nodeId}', ${idx}, this)"
                      onmouseleave="diagram._hideFeatPopover()">
             <div class="feat-card-header">
-                <div class="feat-type-dot" style="background:${dotColor}"></div>
-                <div class="feat-card-main">
+                <div class="feat-type-dot feat-type-dot-clickable" style="background:${dotColor}" onclick="diagram._highlightFeatureUsage('${nodeId}', ${idx}, this)" title="Highlight where this feature is used"></div>
+                <div class="feat-card-main" onclick="diagram._openFeatureModal('${nodeId}', ${idx})" style="cursor:pointer">
                     <div class="feat-card-name">${name}</div>
                     ${desc ? `<div class="feat-card-subdesc">${desc}</div>` : ''}
                 </div>
                 <div class="feat-card-badges">${badges}</div>
                 <div class="feat-card-type">${type}</div>
-                <div class="feat-card-arrow">›</div>
+                <button class="feat-edit-icon" onclick="event.stopPropagation();diagram._openFeatureModal('${nodeId}', ${idx})" title="Edit feature">✏️</button>
             </div>
             ${qualBar}
             ${tags.length > 0 ? `<div class="feat-card-tags">${tags.slice(0,4).map(t=>`<span class="feat-tag-chip">#${t}</span>`).join('')}${tags.length>4?`<span class="feat-tag-chip">+${tags.length-4}</span>`:''}</div>` : ''}
@@ -6228,7 +6385,61 @@ the registry, online store, and offline store settings.
         popover.classList.add('visible');
     }
 
-    _hideFeatPopover() {
+    _highlightFeatureUsage(nodeId, idx, dotEl) {
+        const node = this.nodes.nodes.get(nodeId);
+        if (!node) return;
+        const f = (node.features || [])[idx];
+        if (!f) return;
+        const featName = typeof f === 'string' ? f : f.name;
+
+        // Toggle: if already highlighted, clear
+        if (this._highlightedFeature === `${nodeId}:${idx}`) {
+            this._clearFeatureHighlight();
+            return;
+        }
+        this._clearFeatureHighlight();
+        this._highlightedFeature = `${nodeId}:${idx}`;
+
+        // Find all nodes that reference this feature by name
+        const highlightIds = new Set();
+        this.nodes.nodes.forEach((n, nid) => {
+            if (n.type === 'featureview' && Array.isArray(n.features)) {
+                const has = n.features.some(ff => (typeof ff === 'string' ? ff : ff.name) === featName);
+                if (has) highlightIds.add(nid);
+            }
+            if (n.type === 'service' && Array.isArray(n.features)) {
+                // service features are FV ids — highlight service if any of its FVs have this feature
+                const linked = n.features.some(fvId => highlightIds.has(fvId));
+                if (linked) highlightIds.add(nid);
+            }
+        });
+        this._featureHighlightIds = highlightIds;
+
+        // Visual: dim everything else, pulse dot
+        document.querySelectorAll('.feat-card').forEach(card => {
+            const isThis = card.dataset.nodeid === nodeId && parseInt(card.dataset.idx) === idx;
+            card.classList.toggle('feat-card-highlighted', isThis);
+            card.classList.toggle('feat-card-dimmed', !isThis);
+        });
+        dotEl.classList.add('feat-dot-active');
+        this._highlightDotEl = dotEl;
+
+        this.showNotification('Highlight', `Showing nodes using "${featName}"`);
+    }
+
+    _clearFeatureHighlight() {
+        this._highlightedFeature = null;
+        this._featureHighlightIds = null;
+        if (this._highlightDotEl) {
+            this._highlightDotEl.classList.remove('feat-dot-active');
+            this._highlightDotEl = null;
+        }
+        document.querySelectorAll('.feat-card-highlighted, .feat-card-dimmed').forEach(el => {
+            el.classList.remove('feat-card-highlighted', 'feat-card-dimmed');
+        });
+    }
+
+        _hideFeatPopover() {
         document.getElementById('featHoverPopover')?.classList.remove('visible');
     }
 
