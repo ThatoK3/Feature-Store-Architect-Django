@@ -2419,6 +2419,7 @@ class FeastDiagram {
         
         this.closeModal();
         this.autoLayout();
+        this.updateStats();
         this.updateCodeEditor();
     }
 
@@ -6136,6 +6137,7 @@ the registry, online store, and offline store settings.
 
         const savedCtx = { nodeId, idx };
         this.showNotification('Saved', `Feature "${node.features[idx].name}" updated`);
+        this.updateStats();
 
         // Refresh the panel behind the modal, then re-open modal
         this.showPanel(savedCtx.nodeId);
