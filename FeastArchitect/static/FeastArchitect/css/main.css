@@ -425,31 +425,25 @@
         }
 
         .side-panel.wide {
-            width: 860px;
+            width: 560px;
         }
 
-        /* Two-column layout inside wide panel */
+        /* Single-column scrollable panel content */
         .panel-wide-layout {
-            display: flex;
+            display: block;
             height: 100%;
-            overflow: hidden;
-        }
-
-        .panel-left-col {
-            width: 340px;
-            flex-shrink: 0;
-            display: flex;
-            flex-direction: column;
-            border-right: 1px solid var(--border-color);
             overflow-y: auto;
         }
 
+        .panel-left-col, .panel-right-col {
+            display: block;
+            width: 100%;
+            overflow: visible;
+        }
+
         .panel-right-col {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
             background: var(--bg-primary);
+            border-top: 1px solid var(--border-color);
         }
 
         /* Feature Explorer (right column) */
