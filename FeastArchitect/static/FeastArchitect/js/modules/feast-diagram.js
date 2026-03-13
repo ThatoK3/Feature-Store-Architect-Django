@@ -253,17 +253,26 @@ class FeastDiagram {
     }
 
     _showNewRepoBanner() {
-        const existing = document.getElementById('newRepoBanner');
-        if (existing) return;
+        document.getElementById('newRepoBanner')?.remove();
+        const isDefault = this.repoSettings.name === 'new_feature_store';
         const banner = document.createElement('div');
         banner.id = 'newRepoBanner';
         banner.className = 'new-repo-banner';
-        banner.innerHTML = `
-            <span class="new-repo-banner-icon">✨</span>
-            <span class="new-repo-banner-text">New repository — rename it in Settings before pushing</span>
-            <button class="new-repo-banner-btn" onclick="diagram.showSettings()">Open Settings</button>
-            <button class="new-repo-banner-close" onclick="this.parentElement.remove()">✕</button>
-        `;
+        if (isDefault) {
+            banner.innerHTML = `
+                <span class="new-repo-banner-icon">✨</span>
+                <span class="new-repo-banner-text">New repository — rename it in <strong>Settings</strong> before pushing</span>
+                <button class="new-repo-banner-btn" onclick="diagram.showSettings()">Open Settings</button>
+                <button class="new-repo-banner-close" onclick="this.parentElement.remove()">✕</button>
+            `;
+        } else {
+            banner.innerHTML = `
+                <span class="new-repo-banner-icon">📦</span>
+                <span class="new-repo-banner-text">Imported <strong>${this.repoSettings.name}</strong> — unsaved, push to create on server</span>
+                <button class="new-repo-banner-btn" onclick="diagram.pushRepo()">Push Now</button>
+                <button class="new-repo-banner-close" onclick="this.parentElement.remove()">✕</button>
+            `;
+        }
         document.body.appendChild(banner);
     }
 
@@ -1459,9 +1468,27 @@ class FeastDiagram {
                     const text = await file.text();
                     const data = JSON.parse(text);
                     this.nodes.importFromJSON(data.architecture || data);
+
+                    // Apply repository metadata if present
+                    if (data.repository) {
+                        const repo = data.repository;
+                        this.repoSettings.name         = repo.name         || this.repoSettings.name;
+                        this.repoSettings.location     = repo.location     || this.repoSettings.location;
+                        this.repoSettings.description  = repo.description  || this.repoSettings.description;
+                        this.repoSettings.defaultOwner = repo.defaultOwner || this.repoSettings.defaultOwner;
+                        // Keep isNew=true so user still needs to push — but clear the default name block
+                        // so push is allowed (name is no longer 'new_feature_store')
+                        document.getElementById('newRepoBanner')?.remove();
+                        this._showNewRepoBanner();  // re-show with updated name
+                        this.ui.updateRepoSubtitle(this.repoSettings);
+                        this.codeGen.setRepoSettings(this.repoSettings);
+                    }
+
                     this.updateStats();
                     this.fit();
-                    this.ui.showNotification('Imported', `Loaded ${this.nodes.nodes.size} components`);
+                    this.ui.showNotification('Imported',
+                        `Loaded ${this.nodes.nodes.size} components` +
+                        (data.repository ? ` — "${data.repository.name}"` : ''));
                 }
             } catch (error) {
                 if (error.isConflict) {
