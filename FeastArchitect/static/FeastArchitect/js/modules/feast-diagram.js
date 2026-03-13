@@ -133,7 +133,7 @@ class FeastDiagram {
      */
     initializeRepoSettings() {
         const djangoContext = window.DJANGO_CONTEXT || {};
-        const isNew = this.isEmptyRepo();
+        const isNew = this.isNewRepo();
 
         return {
             name: isNew ? 'new_feature_store' : 'enterprise_feature_store',
@@ -153,14 +153,14 @@ class FeastDiagram {
     getRepoIdFromUrl() {
         const params = new URLSearchParams(window.location.search);
         const repoId = params.get('repo_id');
-        if (!repoId || repoId === 'empty') return null;
+        if (!repoId) return null;
         const parsed = parseInt(repoId);
         return isNaN(parsed) ? null : parsed;
     }
 
-    isEmptyRepo() {
-        const params = new URLSearchParams(window.location.search);
-        return params.get('repo_id') === 'empty';
+    isNewRepo() {
+        // ?new  — presence-only flag for blank repo creation
+        return new URLSearchParams(window.location.search).has('new');
     }
 
     /**
@@ -1387,10 +1387,13 @@ class FeastDiagram {
             if (!repoId) {
                 // New repo created
                 this.repoSettings.id = data.id;
-                // Update URL without reload
+                this.repoSettings.isNew = false;
+                // Replace ?new with ?repo_id=<id> without reload
                 const newUrl = new URL(window.location);
+                newUrl.searchParams.delete('new');
                 newUrl.searchParams.set('repo_id', data.id);
-                window.history.pushState({}, '', newUrl);
+                window.history.replaceState({}, '', newUrl);
+                document.getElementById('newRepoBanner')?.remove();
                 document.getElementById('pushStatus').innerHTML = 
                     `✅ Repository created! ID: ${data.id}`;
             } else {
