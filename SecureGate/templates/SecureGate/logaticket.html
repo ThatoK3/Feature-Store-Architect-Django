@@ -8,7 +8,11 @@
     </div>
     <div class="sg-nav-right">
         {% if username %}<span class="sg-nav-user">{{ username }}</span>{% endif %}
+        {% if username %}
         <button class="sg-nav-btn" onclick="submitLogout()">Sign out</button>
+        {% else %}
+        <a class="sg-nav-btn" href="/auth">Login</a>
+        {% endif %}
     </div>
 </nav>
 {% endblock %}
@@ -26,7 +30,7 @@
         {% csrf_token %}
 
         <div class="sg-field">
-            <select class="sg-select sg-input-no-icon" name="ticket_type" required>
+            <select class="sg-select" name="ticket_type" required>
                 <option value="" disabled selected>Choose category</option>
                 <option value="incident">Report an issue</option>
                 <option value="request">Request access</option>
@@ -62,22 +66,8 @@
 
 {% block custom_script %}
 <script>
-document.getElementById('create-ticket-form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const fd = new FormData(this);
-    fetch('/log_ticket/', { method: 'POST', body: fd })
-        .then(r => r.json())
-        .then(data => {
-            const s = document.getElementById('ticket-success');
-            s.textContent = data.message || 'Request submitted successfully!';
-            s.classList.add('visible');
-            this.reset();
-        })
-        .catch(() => {
-            const el = document.getElementById('ticket-error');
-            el.textContent = 'Could not submit request. Please try again.';
-            el.classList.add('visible');
-        });
-});
+    document.addEventListener('DOMContentLoaded', function() {
+        prepareTicketForm();
+    });
 </script>
 {% endblock %}

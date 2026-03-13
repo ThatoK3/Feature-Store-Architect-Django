@@ -1,302 +1,208 @@
 from django.contrib.auth import login, logout
-from django.http import HttpResponseBadRequest, HttpResponse, HttpResponseRedirect, JsonResponse
+from django.http import HttpResponseRedirect, JsonResponse
 from django.views.decorators.csrf import csrf_protect
 from django.utils.decorators import method_decorator
-from django.middleware.csrf import CsrfViewMiddleware
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .serializers import LoginSerializers, ApplicationSerializer
-from django.contrib.auth.models import update_last_login
-from django.shortcuts import render
-
-from django.contrib.auth.decorators import login_required 
- 
-from rest_framework.decorators import permission_classes
-from rest_framework.permissions import IsAuthenticated
-
-from .models import Application
-
-from axes.decorators import axes_dispatch
-
-from django.contrib import admin
-
-from django_ratelimit.decorators import ratelimit
-
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
+from django.shortcuts import render
+from django.contrib.auth.models import update_last_login
 from django.utils import timezone
 from django.core.signing import Signer, BadSignature
+
+from axes.decorators import axes_dispatch
+from django_ratelimit.decorators import ratelimit
 
 from TicketManager.utils import generate_ticket_reference
 from TicketManager.models import Ticket
 
-from .models import PasswordResetRequest
+from .models import Repository, PasswordResetRequest
+from .serializers import RepositorySerializer, LoginSerializer
 
+
+# ─────────────────────────────────────────
+# Pages
+# ─────────────────────────────────────────
 
 @ratelimit(key='user_or_ip', rate='10/5m')
 def blocked_access(request):
-    return render(request , 'SecureGate/lockout.html', {'page_title': "Access Denied"})
+    return render(request, 'SecureGate/lockout.html', {'page_title': 'Access Denied'})
 
 
 @axes_dispatch
 def login_auth(request):
-    return render(request , 'SecureGate/login.html', {'page_title': "Auth"})
-
-
-class LoginAPIView(APIView):
-    # Add CSRF protection to the view
-    @method_decorator(csrf_protect)
-    def post(self, request, *args, **kwargs):
-        serializer = LoginSerializers(data=request.data, context={'request': request})
-        serializer.is_valid(raise_exception=True)
-        user = serializer.validated_data['user']
-
-        # Log the user in, creating a session
-        login(request, user)
-
-        # Update the last login time
-        update_last_login(None, user)
-
-        return Response({"status": status.HTTP_200_OK, "message": "Login successful"})
-
-
-@permission_classes([IsAuthenticated])
-class LogoutAPIView(APIView):
-    def post(self, request, *args, **kwargs):
-        # Log the user out, destroying the session
-        logout(request)
-        return JsonResponse({"status": status.HTTP_200_OK, "message": "Logout successful"})
-
+    return render(request, 'SecureGate/login.html', {'page_title': 'Sign In'})
 
 
 def choose_app(request):
     if not request.user.is_authenticated:
-        return HttpResponseRedirect('/auth')  
-    
-    username = request.user.username
-    if username:
-        username = username.upper()
-        
-    return render(request, 'SecureGate/chooseapp.html', {'page_title': "ChooseApp", 'username': username})
+        return HttpResponseRedirect('/auth')
+    username = request.user.username.upper() if request.user.username else ''
+    return render(request, 'SecureGate/chooseapp.html', {
+        'page_title': 'Choose Application',
+        'username': username,
+    })
 
 
 @login_required
 def unavailable_app(request):
-    return render(request , 'SecureGate/appunavailable.html', {'page_title': "AppNotAvailable"})
+    return render(request, 'SecureGate/appunavailable.html', {'page_title': 'App Unavailable'})
+
 
 @login_required
 def noaccess_to_app(request):
-    return render(request , 'SecureGate/noaccess.html', {'page_title': "NoAccess"})
+    return render(request, 'SecureGate/noaccess.html', {'page_title': 'No Access'})
+
+
+@ratelimit(key='user_or_ip', rate='10/5m')
+def log_ticket(request):
+    username  = request.user.username.title() if request.user.is_authenticated else ''
+    goto_link = 'Go to applications' if username else 'Go to login'
+    return render(request, 'SecureGate/logaticket.html', {
+        'page_title': 'Submit a Request',
+        'username':   username,
+        'goto_link':  goto_link,
+    })
+
+
+# ─────────────────────────────────────────
+# API
+# ─────────────────────────────────────────
+
+class LoginAPIView(APIView):
+    @method_decorator(csrf_protect)
+    def post(self, request, *args, **kwargs):
+        serializer = LoginSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data['user']
+        login(request, user)
+        update_last_login(None, user)
+        return Response({'status': status.HTTP_200_OK, 'message': 'Login successful'})
+
+
+class LogoutAPIView(APIView):
+    def post(self, request, *args, **kwargs):
+        logout(request)
+        return JsonResponse({'status': status.HTTP_200_OK, 'message': 'Logout successful'})
 
 
 @login_required
-def application_list(request):
-    # Get the user's groups
-    user_groups = request.user.groups.all()
-    
-    # Retrieve all applications
-    applications = Application.objects.all()
-    
-    # Serialize the applications
-    serializer = ApplicationSerializer(applications, many=True)
-    
-    # Deserialize the data
-    data = serializer.data
-    
-    # Check access for each application and set has_access
-    for app in data:
-        app_obj = Application.objects.get(pk=app['id'])
-        has_access = app_obj.access_group in user_groups
-        app['has_access'] = has_access
-    
-    # Return the updated data as JSON response
-    return JsonResponse(data, safe=False)
-
-# handled in TicketManager app
-@ratelimit(key='user_or_ip', rate='10/5m')
-def log_ticket(request):
-    username = request.user.username
-    welcome_nav_text = ""
-    logat_nav_li = '<li class="link"><a style="text-decoration:none" href="../auth">Login</a></li>'
-    goto_link = "Go to login"
-    if username:
-        username = username.title()
-        welcome_nav_text = f"Welcome, {username}!"
-        logat_nav_li = '<li class="link" onclick="submitLogout()"><a>Logout</a></li>'
-        goto_link = "Go to applications"
-
-    return render(request , 'SecureGate/logaticket.html', 
-                    {'page_title': "Log a ticket", 
-                    'username': username,
-                    'welcome_nav_text':welcome_nav_text,
-                    'logat_nav_li':logat_nav_li,
-                    'goto_link':goto_link,}
-                    )
+def repository_list(request):
+    """Returns all repositories the current user has access to."""
+    repos      = Repository.objects.select_related('access_group').all()
+    accessible = [r for r in repos if r.is_accessible_by(request.user)]
+    serializer = RepositorySerializer(accessible, many=True, context={'request': request})
+    return JsonResponse(serializer.data, safe=False)
 
 
+# ─────────────────────────────────────────
+# Password reset
+# ─────────────────────────────────────────
 
-
-
-
-# Step 1: View for requesting password reset
 @ratelimit(key='user_or_ip', rate='2/5m')
 def request_password_reset(request):
-    if request.method == 'POST':
-        username = request.POST.get('username')
-        email = request.POST.get('email')
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
 
-        # Check if the user exists with the given username and email
-        try:
-            user = User.objects.get(username=username, email=email)
-        except User.DoesNotExist:
-            # Handle invalid username or email
-            return JsonResponse({"status": status.HTTP_400_BAD_REQUEST, 'error': 'Invalid username or email'})
+    username = request.POST.get('username')
+    email    = request.POST.get('email')
 
-        
+    try:
+        user = User.objects.get(username=username, email=email)
+    except User.DoesNotExist:
+        return JsonResponse({'error': 'Invalid username or email'}, status=400)
 
-        # Log ticket
-        ticket_reference = generate_ticket_reference('request')
-        ticket = Ticket.objects.create(
-            ticket_reference=ticket_reference,  
-            requester=user,
-            description='Password reset request',
-            ticket_type='request',
-            status='IN_PROGRESS',  
-            open_date=timezone.now(),
-        )
+    ticket_reference = generate_ticket_reference('request')
+    ticket = Ticket.objects.create(
+        ticket_reference=ticket_reference,
+        requester=user,
+        description='Password reset request',
+        ticket_type='request',
+        status='IN_PROGRESS',
+        open_date=timezone.now(),
+    )
 
-        
+    reset_request = PasswordResetRequest.objects.create(
+        username=username,
+        email=email,
+        request_date=timezone.now(),
+        ticket=ticket,
+    )
 
-        # Generate a unique token containing user ID
-        password_reset_request = PasswordResetRequest.objects.create(
-            username=username,
-            email=email,
-            request_date=timezone.now(),
-            ticket=ticket  # Associate the ticket with the password reset request
-        )
-
-        return JsonResponse({"status": status.HTTP_200_OK, 
-            'message': f'Your password reset request ticket was logged under reference: {password_reset_request.ticket}'})
-    else:
-        return JsonResponse({"status": status.HTTP_405_METHOD_NOT_ALLOWED, 'error': 'Method not allowed'})
+    return JsonResponse({
+        'status': 200,
+        'message': f'Password reset request logged under reference: {reset_request.ticket}',
+    })
 
 
-
-# Step 2: View for handling password reset post
 @ratelimit(key='user_or_ip', rate='10/5m')
 def reset_password(request):
-    token = request.GET.get('token', None)
-    
     if request.method == 'GET':
-        # Check if the token is provided
+        token = request.GET.get('token')
         if not token:
-            return JsonResponse({"status": status.HTTP_400_BAD_REQUEST, "error": "Token is missing."})
+            return JsonResponse({'error': 'Token is missing.'}, status=400)
 
-        # Get the salt used for signing the token
-        password_reset_request = PasswordResetRequest.objects.filter(signed_token=token).first()
-        if not password_reset_request:
-            return JsonResponse({"status": status.HTTP_400_BAD_REQUEST, "error": "Invalid token."})
-        
-        salt = password_reset_request.salt
+        reset_req = PasswordResetRequest.objects.filter(signed_token=token).first()
+        if not reset_req:
+            return JsonResponse({'error': 'Invalid token.'}, status=400)
 
-        # Verify the token
         try:
-            signer = Signer(salt=salt)
-            username = signer.unsign(token)
+            Signer(salt=reset_req.salt).unsign(token)
         except BadSignature:
-            return JsonResponse({"status": status.HTTP_400_BAD_REQUEST, "error": "Invalid token."})
+            return JsonResponse({'error': 'Invalid token.'}, status=400)
 
-        
+        return render(request, 'SecureGate/passwordreset.html', {'page_title': 'Reset Password'})
 
-        # Check if the user with the provided username exists
-        try:
-            user = User.objects.get(username=username)
-        except User.DoesNotExist:
-            return JsonResponse({"status": status.HTTP_400_BAD_REQUEST, "error": "User with this username does not exist."})
-
-        # If token is valid and user exists, provide a form to reset the password
-        return render(request , 'SecureGate/passwordreset.html', {'page_title': "Password reset"})
-
-
-    elif request.method == 'POST':
-        token = request.POST.get('token')
+    if request.method == 'POST':
+        token            = request.POST.get('token')
         provided_username = request.POST.get('username')
-        new_password = request.POST.get('password')
-        confirmed_password = request.POST.get('confirm_password')
-        
-        if not new_password:
-            return JsonResponse({"status": status.HTTP_400_BAD_REQUEST, "error": "New password is missing."})
+        new_password     = request.POST.get('password')
+        confirm_password = request.POST.get('confirm_password')
 
-        if not confirmed_password:
-            return JsonResponse({"status": status.HTTP_400_BAD_REQUEST, "error": "Confirmation password is missing."})
-
-        # also handled in the front end
-        if new_password!=confirmed_password:
-            return JsonResponse({"status": status.HTTP_400_BAD_REQUEST, "error": "Passwords do not match."})
-
-        # Check if the token is provided
+        if not new_password or not confirm_password:
+            return JsonResponse({'error': 'Both password fields are required.'}, status=400)
+        if new_password != confirm_password:
+            return JsonResponse({'error': 'Passwords do not match.'}, status=400)
         if not token:
-            return JsonResponse({"status": status.HTTP_400_BAD_REQUEST, "error": "Token is missing."})
+            return JsonResponse({'error': 'Token is missing.'}, status=400)
 
-        # Get the salt used for signing the token
-        password_reset_request = PasswordResetRequest.objects.filter(signed_token=token).first()
-        if not password_reset_request:
-            return JsonResponse({"status": status.HTTP_400_BAD_REQUEST, "error": "Invalid token."})
-        
-        salt = password_reset_request.salt
+        reset_req = PasswordResetRequest.objects.filter(signed_token=token).first()
+        if not reset_req:
+            return JsonResponse({'error': 'Invalid token.'}, status=400)
 
-        # Verify the token
         try:
-            signer = Signer(salt=salt)
-            username = signer.unsign(token)
-
-            # checks if username!=provided_username / token not signed by the provided user
-            # username --> from token ; provided_username--> from request & SHOULD only be used here
-            if username!=provided_username:
-                return JsonResponse({"status": status.HTTP_400_BAD_REQUEST, "error": "Username provided is incorrect."})
-
+            username = Signer(salt=reset_req.salt).unsign(token)
         except BadSignature:
-            return JsonResponse({"status": status.HTTP_400_BAD_REQUEST, "error": "Invalid token."})
+            return JsonResponse({'error': 'Invalid token.'}, status=400)
 
-        # Check if the user with the provided username exists
+        if username != provided_username:
+            return JsonResponse({'error': 'Username does not match token.'}, status=400)
+
         try:
             user = User.objects.get(username=username)
         except User.DoesNotExist:
-            return JsonResponse({"status": status.HTTP_400_BAD_REQUEST, "error": "User with this username does not exist."})
+            return JsonResponse({'error': 'User not found.'}, status=400)
 
-        # Set new password for the user and save
         user.set_password(new_password)
         user.save()
 
-        # Set token and salt to empty strings; update change date
-        password_reset_request.signed_token = ''
-        password_reset_request.salt = ''
-        password_reset_request.password_change_date = timezone.now()
-        password_reset_request.url = '__already_used__'
-        password_reset_request.save()
+        reset_req.signed_token        = ''
+        reset_req.salt                = ''
+        reset_req.password_change_date = timezone.now()
+        reset_req.url                 = '__already_used__'
+        reset_req.save()
 
-        ticket_reference = password_reset_request.ticket
+        linked_ticket = Ticket.objects.filter(
+            ticket_reference=reset_req.ticket
+        ).first()
+        if linked_ticket:
+            linked_ticket.status       = 'RESOLVED'
+            linked_ticket.resolve_date = timezone.now()
+            linked_ticket.task_comments = f'Password changed by {user.username} via reset.'
+            linked_ticket.save()
 
-        if ticket_reference:
-            linked_ticket = Ticket.objects.filter(ticket_reference=ticket_reference).first()
-            if linked_ticket:
-                linked_ticket.status = 'RESOLVED'
-                linked_ticket.resolve_date = timezone.now()
-                linked_ticket.task_comments = f'Password changed by {user.username} (USERNAME) in the password reset view.'
-                linked_ticket.save()  # Corrected typo here
-            else:
-                print("No linked ticket found for reference:", ticket_reference)
-        else:
-            print("No ticket reference found in password reset request")
+        return JsonResponse({'status': 200, 'message': 'Password reset successfully'})
 
-        # Return success 
-        return JsonResponse({"status": status.HTTP_200_OK, 'message': 'Password reset successfully'})
-
-    else:
-        return JsonResponse({"status": status.HTTP_405_METHOD_NOT_ALLOWED, 'error': 'Method not allowed'})
-
-
-
-
-
-
+    return JsonResponse({'error': 'Method not allowed'}, status=405)

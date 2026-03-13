@@ -1,50 +1,46 @@
-function prepareTicketForm(){
-    document.getElementsByName("description")[0].value = 'Name: \nContact Number: \nQuery information: \n';
-    $('#create-ticket-form').on('submit', function(event) {
-        event.preventDefault(); // Prevent default form submission
+/* logTicket.js — vanilla JS, no jQuery */
+function prepareTicketForm() {
+    const desc = document.getElementsByName('description')[0];
+    if (desc) desc.value = 'Name: \nContact Number: \nQuery information: \n';
 
-        // Serialize form data
-        var formData = $(this).serialize();
+    const form = document.getElementById('create-ticket-form');
+    if (!form) return;
 
-        // Send AJAX request
-        $.ajax({
-            url: '/create_ticket/', 
-            type: 'POST',
-            data: formData,
-            dataType: 'json', // Expect JSON response
-            success: function(response) {
-                // Handle success response
-                let goto = document.getElementsByClassName('txt2')[0].outerHTML;
-                document.getElementsByTagName("form")[0]
-                .outerHTML = `<form class="myform100-form validate-form">
-                                <span class="myform100-form-title" style="
-                                padding-bottom: 20px; color:green
-                            ">Query Logged Successfully!</span><span class="myform100-form-title" style="
-                                font-size: 11px;
-                                color: #4343f1;
-                                text-align: center;
-                                padding-bottom: 30px;
-                            "> Your query reference: ${response.reference} </span>
-                            <span class="myform100-form-title" style="
-                            font-size: 11px;
-                            color: #4343f1;
-                            text-align: center;
-                            padding-bottom: 80px;
-                            ">We will get back to you as soon as possible.</span>
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const fd = new FormData(this);
 
-                            ${goto}
-                        </form>`;
-                
-                // fix style (center txt2 goto text)
-                document.getElementsByClassName('txt2')[0].style.marginLeft = '90px';
-            },
-            error: function(xhr, status, error) {
-                // Handle error response
-                console.error('Error: ' + error);
-
+        fetch('/create_ticket/', {
+            method: 'POST',
+            body: fd,
+            headers: { 'X-CSRFToken': (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || '' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            const gotoLink = document.querySelector('.sg-link') 
+                ? document.querySelector('.sg-link').outerHTML : '';
+            
+            const success = document.getElementById('ticket-success');
+            const body    = document.querySelector('.sg-card-body');
+            if (success) {
+                success.textContent = `Query logged! Reference: ${data.reference}. We'll get back to you shortly.`;
+                success.classList.add('visible');
+                this.reset();
+            } else if (body) {
+                body.innerHTML = `
+                    <div style="text-align:center;padding:16px 0;display:flex;flex-direction:column;gap:12px;align-items:center">
+                        <div style="font-size:32px">✅</div>
+                        <div style="font-size:15px;font-weight:700;color:var(--feast-green)">Query Logged Successfully!</div>
+                        <div style="font-size:13px;color:var(--text-secondary)">Reference: <strong>${data.reference}</strong></div>
+                        <div style="font-size:12px;color:var(--text-muted)">We will get back to you as soon as possible.</div>
+                        ${gotoLink}
+                    </div>`;
             }
+        })
+        .catch(err => {
+            const el = document.getElementById('ticket-error');
+            if (el) { el.textContent = 'Could not submit. Please try again.'; el.classList.add('visible'); }
+            console.error('Ticket error:', err);
         });
     });
 }
-
-

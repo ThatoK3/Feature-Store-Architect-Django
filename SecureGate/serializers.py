@@ -1,62 +1,44 @@
 from rest_framework import serializers
-from .models import Application, Function, UserAccess, FunctionAccess
-from django.contrib.auth.models import User
-
 from django.contrib.auth import authenticate
 from django.utils.translation import gettext_lazy as _
+from .models import Repository
 
 
-class ApplicationSerializer(serializers.ModelSerializer):
+class RepositorySerializer(serializers.ModelSerializer):
+    has_access = serializers.SerializerMethodField()
+
     class Meta:
-        model = Application
-        fields = ['id', 'name', 'url', 'description']
+        model  = Repository
+        fields = ['id', 'name', 'description', 'url', 'default_owner', 'created_at', 'has_access']
 
-class FunctionSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Function
-        fields = ['id', 'name', 'description', 'application']
-
-class UserAccessSerializer(serializers.ModelSerializer):
-    functions = FunctionSerializer(many=True, read_only=True)
-    
-    class Meta:
-        model = UserAccess
-        fields = ['id', 'user', 'application', 'functions']
-
-class FunctionAccessSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = FunctionAccess
-        fields = ['id', 'user', 'function']
+    def get_has_access(self, obj):
+        request = self.context.get('request')
+        return obj.is_accessible_by(request.user) if request else False
 
 
-class LoginSerializers(serializers.Serializer):
+class LoginSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=255, required=False)
-    email = serializers.EmailField(max_length=255, required=False)
-    password = serializers.CharField(
-        label=_("Password"),
-        style={'input_type': 'password'},
-        trim_whitespace=False,
-        max_length=128,
-        write_only=True
-    )
+    email    = serializers.EmailField(max_length=255, required=False)
+    password = serializers.CharField(write_only=True, trim_whitespace=False)
 
     def validate(self, data):
         username = data.get('username')
-        email = data.get('email')
+        email    = data.get('email')
         password = data.get('password')
 
         if not (username or email) or not password:
-            msg = _('Must include either "username" or "email" and "password".')
-            raise serializers.ValidationError(msg, code='authorization')
+            raise serializers.ValidationError(
+                _('Provide username or email and password.'), code='authorization'
+            )
 
-        user = authenticate(request=self.context.get('request'), username=username, email=email, password=password)
-
-
+        user = authenticate(
+            request=self.context.get('request'),
+            username=username, email=email, password=password
+        )
         if not user:
-            msg = _('Unable to log in with provided credentials.')
-            raise serializers.ValidationError(msg, code='authorization')
+            raise serializers.ValidationError(
+                _('Invalid credentials.'), code='authorization'
+            )
 
         data['user'] = user
         return data
-
-

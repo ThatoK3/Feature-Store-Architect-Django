@@ -85,7 +85,7 @@ function submitLoginForm() {
     const form = document.getElementById('login-form');
     const fd = new FormData(form);
 
-    fetch('../xloginapi/', { method: 'POST', body: fd })
+    fetch('/xloginapi/', { method: 'POST', body: fd })
         .then(r => {
             if (!r.ok) throw new Error('Login failed');
             return r.json();
@@ -204,7 +204,7 @@ function submitAccessForm() {
     fd.append('description', (body.querySelector('[name="description"]') || {}).value || '');
     fd.append('email', (body.querySelector('[name="email"]') || {}).value || '');
 
-    fetch('/log_ticket/', { method: 'POST', body: fd })
+    fetch('/create_ticket/', { method: 'POST', body: fd })
         .then(r => r.json())
         .then(data => {
             const s = document.getElementById('access-success');

@@ -1,99 +1,37 @@
 from django.contrib import admin
-from .models import Application, Function, UserAccess, FunctionAccess, PasswordResetRequest
+from django.contrib.auth.models import Group
+from .models import Repository, PasswordResetRequest
 
-# Entity-Relationship Diagram (ERD):
-"""
-    +-----------------------+
-    |      Application      |
-    +-----------------------+
-    | id (PK)               |
-    | name                  |
-    | url                   |
-    | description           |
-    +-----------------------+
-            | 1
-            |
-            |
-            |
-            | 1
-    +-----------------------+
-    |       Function        |
-    +-----------------------+
-    | id (PK)               |
-    | name                  |
-    | description           |
-    | application_id (FK)   |
-    +-----------------------+
-            | 1
-            |
-            |
-            |
-            |
-            | N
-    +-----------------------+
-    |      UserAccess       |
-    +-----------------------+
-    | id (PK)               |
-    | user_id (FK)          |
-    | application_id (FK)   |
-    +-----------------------+
-            | 1
-            |
-            |
-            |
-            |
-            | N
-    +-----------------------+
-    |     FunctionAccess    |
-    +-----------------------+
-    | id (PK)               |
-    | user_id (FK)          |
-    | function_id (FK)      |
-    +-----------------------+
-"""
 
-@admin.register(Application)
-class ApplicationAdmin(admin.ModelAdmin):
-    """
-    Admin interface for managing applications.
-    """
-    list_display = ('name', 'url', 'description')
-
-@admin.register(Function)
-class FunctionAdmin(admin.ModelAdmin):
-    """
-    Admin interface for managing functions.
-    """
-    list_display = ('name', 'description', 'application')
-
-@admin.register(UserAccess)
-class UserAccessAdmin(admin.ModelAdmin):
-    """
-    Admin interface for managing user access to applications and functions.
-    """
-    list_display = ('user', 'application', 'get_functions')
-
-    def get_functions(self, obj):
-        """
-        Custom method to display functions associated with the user access.
-        """
-        return ", ".join([function.name for function in obj.functions.all()])
-
-@admin.register(FunctionAccess)
-class FunctionAccessAdmin(admin.ModelAdmin):
-    """
-    Admin interface for managing user access to functions.
-    """
-    list_display = ('user', 'function')
-
+@admin.register(Repository)
+class RepositoryAdmin(admin.ModelAdmin):
+    list_display  = ('name', 'access_group', 'default_owner', 'created_at')
+    list_filter   = ('access_group',)
+    search_fields = ('name', 'description')
+    readonly_fields = ('created_at', 'updated_at')
+    fieldsets = (
+        (None, {
+            'fields': ('name', 'description', 'url', 'default_owner')
+        }),
+        ('Access Control', {
+            'fields': ('access_group',),
+            'description': (
+                'Assign a Group to restrict access. '
+                'Leave blank to allow all authenticated users.'
+            ),
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',),
+        }),
+    )
 
 
 @admin.register(PasswordResetRequest)
 class PasswordResetRequestAdmin(admin.ModelAdmin):
-    list_display = ['username', 'email', 'request_date', 'password_change_date']
-    search_fields = ['username', 'email', 'ticket__ticket_reference']
-    list_filter = ['request_date', 'password_change_date']
-
-
-
-    
+    list_display  = ('username', 'email', 'request_date', 'password_change_date')
+    search_fields = ('username', 'email')
+    readonly_fields = (
+        'salt', 'signed_token', 'url',
+        'request_date', 'password_change_date',
+    )
