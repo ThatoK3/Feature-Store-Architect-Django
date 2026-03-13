@@ -261,7 +261,7 @@ class FeastDiagram {
         banner.innerHTML = `
             <span class="new-repo-banner-icon">✨</span>
             <span class="new-repo-banner-text">New repository — rename it in Settings before pushing</span>
-            <button class="new-repo-banner-btn" onclick="diagram.openSettings()">Open Settings</button>
+            <button class="new-repo-banner-btn" onclick="diagram.showSettings()">Open Settings</button>
             <button class="new-repo-banner-close" onclick="this.parentElement.remove()">✕</button>
         `;
         document.body.appendChild(banner);
@@ -1287,7 +1287,7 @@ class FeastDiagram {
         if (!repoId && repoName === 'new_feature_store') {
             this.showNotification('Rename Required',
                 'Please rename your repository in Settings before pushing.', 'error');
-            this.openSettings();
+            this.showSettings();
             return;
         }
 
