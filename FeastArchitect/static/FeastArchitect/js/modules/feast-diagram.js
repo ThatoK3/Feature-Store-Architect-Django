@@ -700,6 +700,18 @@ class FeastDiagram {
             }
         });
         
+        // Click on a search result — use mousedown so it fires before blur
+        if (searchDropdown) {
+            searchDropdown.addEventListener('mousedown', (e) => {
+                const item = e.target.closest('.search-result-item');
+                if (!item) return;
+                e.preventDefault(); // prevent input blur before click fires
+                const id   = item.dataset.nodeId;
+                const type = item.dataset.resultType;
+                if (id) this.selectSearchResult(id, type);
+            });
+        }
+
         // Close search when clicking outside
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.search-box') && searchDropdown) {
