@@ -59,7 +59,7 @@
     </form>
 
     <div class="sg-card-footer">
-        <a href="{{ goto_link|default:'/' }}" class="sg-link">← Go back</a>
+        <a href="{{ back_url|default:'/' }}" class="sg-link">← {{ back_label|default:"Go back" }}</a>
     </div>
 </div>
 {% endblock %}

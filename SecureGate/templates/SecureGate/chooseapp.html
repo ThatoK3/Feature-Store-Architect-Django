@@ -18,8 +18,8 @@
 
     <div class="sg-card-header">
         <div class="sg-card-logo">⚡</div>
-        <div class="sg-card-title">Choose Application</div>
-        <div class="sg-card-subtitle">Open an existing repository or start something new</div>
+        <div class="sg-card-title">Feature Repos</div>
+        <div class="sg-card-subtitle">Open a feature store repo or create a new one</div>
     </div>
 
     <!-- Quick actions -->
@@ -40,7 +40,7 @@
             </div>
             <div>
                 <div class="sg-action-label">Open Example</div>
-                <div class="sg-action-desc">Explore a sample architecture</div>
+                <div class="sg-action-desc">Load the example feature store</div>
             </div>
         </button>
 
@@ -69,7 +69,7 @@
         {% csrf_token %}
         <button class="sg-open-btn" id="openAppBtn" onclick="openSelected()" disabled>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Open Application
+            Open Repository
         </button>
     </div>
 

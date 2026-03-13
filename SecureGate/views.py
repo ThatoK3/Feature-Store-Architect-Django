@@ -41,8 +41,8 @@ def choose_app(request):
         return HttpResponseRedirect('/auth')
     username = request.user.username.upper() if request.user.username else ''
     return render(request, 'SecureGate/chooseapp.html', {
-        'page_title': 'Choose Application',
-        'username': username,
+        'page_title': 'Choose Repository',
+        'username':   username,
     })
 
 
@@ -58,12 +58,14 @@ def noaccess_to_app(request):
 
 @ratelimit(key='user_or_ip', rate='10/5m')
 def log_ticket(request):
-    username  = request.user.username.title() if request.user.is_authenticated else ''
-    goto_link = 'Go to applications' if username else 'Go to login'
+    username   = request.user.username.title() if request.user.is_authenticated else ''
+    back_url   = '/' if username else '/auth'
+    back_label = 'Back to repositories' if username else 'Back to login'
     return render(request, 'SecureGate/logaticket.html', {
         'page_title': 'Submit a Request',
         'username':   username,
-        'goto_link':  goto_link,
+        'back_url':   back_url,
+        'back_label': back_label,
     })
 
 
@@ -90,7 +92,6 @@ class LogoutAPIView(APIView):
 
 @login_required
 def repository_list(request):
-    """Returns all repositories the current user has access to."""
     repos      = Repository.objects.select_related('access_group').all()
     accessible = [r for r in repos if r.is_accessible_by(request.user)]
     serializer = RepositorySerializer(accessible, many=True, context={'request': request})
@@ -156,10 +157,10 @@ def reset_password(request):
         return render(request, 'SecureGate/passwordreset.html', {'page_title': 'Reset Password'})
 
     if request.method == 'POST':
-        token            = request.POST.get('token')
+        token             = request.POST.get('token')
         provided_username = request.POST.get('username')
-        new_password     = request.POST.get('password')
-        confirm_password = request.POST.get('confirm_password')
+        new_password      = request.POST.get('password')
+        confirm_password  = request.POST.get('confirm_password')
 
         if not new_password or not confirm_password:
             return JsonResponse({'error': 'Both password fields are required.'}, status=400)
@@ -188,18 +189,16 @@ def reset_password(request):
         user.set_password(new_password)
         user.save()
 
-        reset_req.signed_token        = ''
-        reset_req.salt                = ''
+        reset_req.signed_token         = ''
+        reset_req.salt                 = ''
         reset_req.password_change_date = timezone.now()
-        reset_req.url                 = '__already_used__'
+        reset_req.url                  = '__already_used__'
         reset_req.save()
 
-        linked_ticket = Ticket.objects.filter(
-            ticket_reference=reset_req.ticket
-        ).first()
+        linked_ticket = Ticket.objects.filter(ticket_reference=reset_req.ticket).first()
         if linked_ticket:
-            linked_ticket.status       = 'RESOLVED'
-            linked_ticket.resolve_date = timezone.now()
+            linked_ticket.status        = 'RESOLVED'
+            linked_ticket.resolve_date  = timezone.now()
             linked_ticket.task_comments = f'Password changed by {user.username} via reset.'
             linked_ticket.save()
 
