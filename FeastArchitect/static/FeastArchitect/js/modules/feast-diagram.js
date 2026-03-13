@@ -133,13 +133,15 @@ class FeastDiagram {
      */
     initializeRepoSettings() {
         const djangoContext = window.DJANGO_CONTEXT || {};
-        
+        const isNew = this.isEmptyRepo();
+
         return {
-            name: 'enterprise_feature_store',
-            location: '/opt/feast/feature_repo',
+            name: isNew ? 'new_feature_store' : 'enterprise_feature_store',
+            location: isNew ? '/opt/feast/feature_repo' : '/opt/feast/feature_repo',
             defaultOwner: 'Data Platform Team',
             id: djangoContext.repoId || this.getRepoIdFromUrl(),
-            description: 'Enterprise feature store powering machine learning across personalization, fraud detection, and search ranking use cases.'
+            description: isNew ? '' : 'Enterprise feature store powering machine learning across personalization, fraud detection, and search ranking use cases.',
+            isNew: isNew
         };
     }
 
@@ -151,7 +153,14 @@ class FeastDiagram {
     getRepoIdFromUrl() {
         const params = new URLSearchParams(window.location.search);
         const repoId = params.get('repo_id');
-        return repoId ? parseInt(repoId) : null;
+        if (!repoId || repoId === 'empty') return null;
+        const parsed = parseInt(repoId);
+        return isNaN(parsed) ? null : parsed;
+    }
+
+    isEmptyRepo() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('repo_id') === 'empty';
     }
 
     /**
@@ -228,6 +237,10 @@ class FeastDiagram {
         if (this.repoSettings.id) {
             await this.loadFromBackend();
             this.updateStats();
+        } else if (this.repoSettings.isNew) {
+            // Empty new repo — blank canvas, no example data
+            this.updateStats();
+            this._showNewRepoBanner();
         } else {
             loadComplexExample(this.nodes, 
                 (from, to) => this.nodes.addConnection(from, to),
@@ -237,6 +250,21 @@ class FeastDiagram {
             // Fit view after layout
             setTimeout(() => this.animateFit(), 1000);
         }
+    }
+
+    _showNewRepoBanner() {
+        const existing = document.getElementById('newRepoBanner');
+        if (existing) return;
+        const banner = document.createElement('div');
+        banner.id = 'newRepoBanner';
+        banner.className = 'new-repo-banner';
+        banner.innerHTML = `
+            <span class="new-repo-banner-icon">✨</span>
+            <span class="new-repo-banner-text">New repository — rename it in Settings before pushing</span>
+            <button class="new-repo-banner-btn" onclick="diagram.openSettings()">Open Settings</button>
+            <button class="new-repo-banner-close" onclick="this.parentElement.remove()">✕</button>
+        `;
+        document.body.appendChild(banner);
     }
 
     /**
@@ -1254,10 +1282,18 @@ class FeastDiagram {
     async pushRepo() {
         const repoId = this.repoSettings.id;
         const repoName = this.repoSettings.name;
-        
+
+        // Block push for new repos that still have the default name
+        if (!repoId && repoName === 'new_feature_store') {
+            this.showNotification('Rename Required',
+                'Please rename your repository in Settings before pushing.', 'error');
+            this.openSettings();
+            return;
+        }
+
         // Confirmation based on repo ID presence
         if (!repoId) {
-            if (!confirm('No repository ID found. Are you sure you want to create a new repository?')) {
+            if (!confirm(`Create new repository "${repoName}"?`)) {
                 return;
             }
         } else {

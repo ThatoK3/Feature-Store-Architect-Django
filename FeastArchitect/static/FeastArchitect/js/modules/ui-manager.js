@@ -295,7 +295,10 @@ class UIManager {
      */
     updateRepoSubtitle(repoSettings) {
         const subtitle = document.getElementById('repoSubtitle');
-        if (subtitle) {
+        if (!subtitle) return;
+        if (repoSettings.isNew) {
+            subtitle.innerHTML = `<span class="repo-new-badge">NEW</span> ${repoSettings.name} <span style="opacity:0.5">· unsaved</span>`;
+        } else {
             subtitle.textContent = `${repoSettings.name} • ${repoSettings.location}`;
         }
     }

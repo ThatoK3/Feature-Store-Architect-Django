@@ -5241,3 +5241,74 @@
         .feat-card-dimmed {
             opacity: 0.35;
         }
+
+        /* ── New repo banner ── */
+        .new-repo-banner {
+            position: fixed;
+            top: 64px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 16px;
+            background: linear-gradient(135deg, rgba(139,92,246,0.18), rgba(59,130,246,0.12));
+            border: 1px solid rgba(139,92,246,0.35);
+            border-radius: 10px;
+            font-size: 13px;
+            color: var(--text-primary);
+            z-index: 500;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            animation: banner-in 0.35s cubic-bezier(0.34,1.56,0.64,1);
+            white-space: nowrap;
+        }
+
+        @keyframes banner-in {
+            from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+            to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        .new-repo-banner-icon { font-size: 15px; }
+
+        .new-repo-banner-text { color: var(--text-secondary); }
+
+        .new-repo-banner-btn {
+            padding: 4px 12px;
+            background: var(--feast-purple);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .new-repo-banner-btn:hover { background: #7c3aed; }
+
+        .new-repo-banner-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 13px;
+            padding: 2px 4px;
+            border-radius: 4px;
+            line-height: 1;
+        }
+
+        .new-repo-banner-close:hover { color: var(--text-primary); background: var(--bg-tertiary); }
+
+        /* ── New repo badge in toolbar subtitle ── */
+        .repo-new-badge {
+            display: inline-block;
+            padding: 1px 6px;
+            background: var(--feast-purple);
+            color: white;
+            font-size: 9px;
+            font-weight: 700;
+            border-radius: 4px;
+            letter-spacing: 0.05em;
+            vertical-align: middle;
+            margin-right: 2px;
+        }
