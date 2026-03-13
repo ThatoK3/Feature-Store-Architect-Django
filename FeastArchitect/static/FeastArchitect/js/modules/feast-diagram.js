@@ -3978,15 +3978,8 @@ class FeastDiagram {
         document.getElementById('tooltip').style.display = 'none';
     }
 
-    showNotification(title, text) {
-        const notif = document.getElementById('notification');
-        document.getElementById('notifTitle').textContent = title;
-        document.getElementById('notifText').textContent = text;
-        
-        notif.classList.add('show');
-        setTimeout(() => {
-            notif.classList.remove('show');
-        }, 3000);
+    showNotification(title, text, type = 'success', duration = 3000) {
+        this.ui.showNotification(title, text, type, duration);
     }
 
     loadPattern(patternName) {

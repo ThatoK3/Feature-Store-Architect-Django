@@ -45,19 +45,34 @@ class UIManager {
      * @param {string} text - Notification message
      * @param {number} duration - Display duration in ms
      */
-    showNotification(title, text, duration = 3000) {
+    showNotification(title, text, type = 'success', duration = 3000) {
         const notif = document.getElementById('notification');
         if (!notif) return;
 
         const titleEl = document.getElementById('notifTitle');
-        const textEl = document.getElementById('notifText');
+        const textEl  = document.getElementById('notifText');
+        const iconEl  = document.getElementById('notifIcon');
 
         if (titleEl) titleEl.textContent = title;
-        if (textEl) textEl.textContent = text;
+        if (textEl)  textEl.textContent  = text;
+
+        // Type → icon + CSS class
+        const types = {
+            success: { icon: '✅', cls: '' },
+            error:   { icon: '❌', cls: 'notif-error' },
+            warning: { icon: '⚠️', cls: 'notif-warning' },
+            info:    { icon: 'ℹ️', cls: 'notif-info' },
+        };
+        const cfg = types[type] || types.success;
+        if (iconEl) iconEl.textContent = cfg.icon;
+
+        notif.classList.remove('notif-error', 'notif-warning', 'notif-info');
+        if (cfg.cls) notif.classList.add(cfg.cls);
 
         notif.classList.add('show');
-        
-        setTimeout(() => {
+
+        clearTimeout(notif._hideTimer);
+        notif._hideTimer = setTimeout(() => {
             notif.classList.remove('show');
         }, duration);
     }

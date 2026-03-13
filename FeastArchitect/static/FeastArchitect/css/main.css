@@ -5312,3 +5312,22 @@
             vertical-align: middle;
             margin-right: 2px;
         }
+
+        /* ── Notification type variants ── */
+        .notification.notif-error {
+            border-color: rgba(239,68,68,0.5);
+            background: linear-gradient(135deg, var(--bg-secondary), rgba(239,68,68,0.06));
+        }
+        .notification.notif-error .notification-title { color: var(--feast-red); }
+
+        .notification.notif-warning {
+            border-color: rgba(234,179,8,0.5);
+            background: linear-gradient(135deg, var(--bg-secondary), rgba(234,179,8,0.06));
+        }
+        .notification.notif-warning .notification-title { color: var(--feast-yellow); }
+
+        .notification.notif-info {
+            border-color: rgba(59,130,246,0.5);
+            background: linear-gradient(135deg, var(--bg-secondary), rgba(59,130,246,0.06));
+        }
+        .notification.notif-info .notification-title { color: var(--feast-blue); }
