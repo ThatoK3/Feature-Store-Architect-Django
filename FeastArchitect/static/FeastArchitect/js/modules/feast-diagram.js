@@ -227,12 +227,13 @@ class FeastDiagram {
     async loadInitialData() {
         if (this.repoSettings.id) {
             await this.loadFromBackend();
+            this.updateStats();
         } else {
             loadComplexExample(this.nodes, 
                 (from, to) => this.nodes.addConnection(from, to),
                 () => this.autoLayout()
             );
-            
+            this.updateStats();
             // Fit view after layout
             setTimeout(() => this.animateFit(), 1000);
         }
