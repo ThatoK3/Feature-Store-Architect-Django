@@ -1,381 +1,233 @@
+/* auth.js — SecureGate vanilla JS (no jQuery) */
 
-function setupFormValidation(formSelector, inputSelector, submitButtonSelector, onSubmit) {
-    "use strict";
-
-    // Validate form inputs
-    function validateForm() {
-        var input = $(formSelector).find(inputSelector);
-        var check = true;
-
-        input.each(function(index, element) {
-            if (!validate(element)) {
-                showValidate(element);
-                check = false;
-            }
-        });
-
-        if (check) {
-            onSubmit(); // Call the provided callback function
-        }
-    }
-
-    // Form submission handler
-    function handleFormSubmission(event) {
-        event.preventDefault(); // Prevent the default form submission
-        validateForm();
-    }
-
-    // Hide validation messages on focus
-    $(formSelector).find(inputSelector).each(function() {
-        $(this).focus(function() {
-            hideValidate(this);
-        });
-    });
-
-    // Attach click event listener to the submit button
-    $(submitButtonSelector).on('click', handleFormSubmission);
-
-    // Validation function
-    function validate(input) {
-        if ($(input).attr('type') == 'email' || $(input).attr('name') == 'email') {
-            if (!$(input).val().trim().match(/^([a-zA-Z0-9_\-\.]+)@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.)|(([a-zA-Z0-9\-]+\.)+))([a-zA-Z]{1,5}|[0-9]{1,3})(\]?)$/)) {
-                return false;
-            }
-        } else {
-            if ($(input).val().trim() == '') {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    // Show validation message
-    function showValidate(input) {
-        var thisAlert = $(input).parent();
-        $(thisAlert).addClass('alert-validate');
-    }
-
-    // Hide validation message
-    function hideValidate(input) {
-        var thisAlert = $(input).parent();
-        $(thisAlert).removeClass('alert-validate');
-    }
+/* ─────────────────────────────────────────
+   Helpers
+───────────────────────────────────────── */
+function csrf() {
+    const el = document.querySelector('[name=csrfmiddlewaretoken]');
+    return el ? el.value : '';
 }
 
+function post(url, formData) {
+    return fetch(url, {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-CSRFToken': csrf() }
+    });
+}
 
+function showError(id, msg) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.add('visible');
+}
 
+function hideError(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('visible');
+}
 
+function validateField(fieldId, inputName, msg) {
+    const field = document.getElementById(fieldId);
+    if (!field) return true;
+    const input = field.querySelector('[name="' + inputName + '"]');
+    const val = input ? input.value.trim() : '';
+    if (!val) {
+        field.classList.add('invalid');
+        const errEl = field.querySelector('.sg-field-error');
+        if (errEl && msg) errEl.textContent = msg;
+        return false;
+    }
+    field.classList.remove('invalid');
+    return true;
+}
 
-$(document).ready(function() {
-  if (document.getElementById('login')) {
-      setupFormValidation('.validate-form', '.input100', '#login', function() {
-        // Callback function to handle form submission
+function validateEmail(fieldId) {
+    const field = document.getElementById(fieldId);
+    if (!field) return true;
+    const input = field.querySelector('[type="email"]');
+    const val = input ? input.value.trim() : '';
+    const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+    field.classList.toggle('invalid', !ok);
+    return ok;
+}
+
+/* ─────────────────────────────────────────
+   Login page
+───────────────────────────────────────── */
+(function initLogin() {
+    const form = document.getElementById('login-form');
+    if (!form) return;
+
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        hideError('login_error');
+
+        let valid = true;
+        valid = validateField('field-username', 'username') && valid;
+        valid = validateField('field-password', 'password') && valid;
+        if (!valid) return;
+
         submitLoginForm();
-      });
-  }
-});
-
-
-function recoverPassword(){
-	$("form")[0].innerHTML= `
-	${csrf_middleware_token.outerHTML}		
-	<span class="myform100-form-title" style="
-    padding-bottom: 20px;
-">Forgot password</span><span class="myform100-form-title" style="
-    font-size: 11px;
-    color: #4343f1;
-    text-align: center;
-    padding-bottom: 30px;
-">Enter your details then we will get back to you</span>
-
-					<div class="wrap-input100 validate-input" data-validate="Valid username is required">
-						<input class="input100" type="text" name="username" placeholder="Username">
-						<span class="focus-input100"></span>
-						<span class="symbol-input100">
-							<i class="fa fa-user" aria-hidden="true"></i>
-						</span>
-					</div>
-
-          <div class="wrap-input100 validate-input" data-validate="Valid email is required: ex@abc.xyz">
-						<input class="input100" type="text" name="email" placeholder="Email">
-						<span class="focus-input100"></span>
-						<span class="symbol-input100">
-							<i class="fa fa-envelope" aria-hidden="true"></i>
-						</span>
-					</div>
-
-					
-					
-					<div class="container-myform100-form-btn">
-						<button class="myform100-form-btn" id="password-reset">Send</button>
-					</div>
-
-					<div class="text-center p-t-136">
-						<a onclick="goToLogin()" class="txt2" href="#login">
-							Go back to login	
-							<i class="fa fa-long-arrow-left m-l-5" aria-hidden="true"></i>
-						</a>
-					</div>
-`;
-    setupFormValidation('.validate-form', '.input100', '#password-reset', function() {
-      // Callback function to handle form submission
-      submitPassResetForm();
     });
-}
 
-
-
-
-
-
-
-
-function requestAccess(){
-	$("form")[0].innerHTML=`
-	${csrf_middleware_token.outerHTML}
-<form class="myform100-form validate-form">
-		<span class="myform100-form-title" style="
-    font-size: 11px;
-    color: #4343f1;
-    text-align: center;
-    padding-bottom: 10px;
-">Enter your details then we will get back to you</span>
-
-<select style="margin-bottom: 25px; height: 44px" class="input" name="ticket_type">
-<option value="" selected="">Choose category</option>
-<option value="incident">Report an issue</option>
-<option value="request">Request access</option>
-</select>
-
-
-<textarea class="form-textarea" name="description"></textarea>
-
-<div class="wrap-input100 validate-input" data-validate="Valid email is required: ex@abc.xyz" style="
-margin-top: 30px;">
-      <input class="input100" type="text" name="email" placeholder="Email">
-      <span class="focus-input100"></span>
-      <span class="symbol-input100">
-        <i class="fa fa-envelope" aria-hidden="true"></i>
-      </span>
-</div>
-
-<div class="container-myform100-form-btn">
-<button type="submit" style="margin-top: 30px" class="myform100-form-btn">
-  Send
-</button>
-</div>
-
-<div class="text-center p-t-25">
-<a href="#login" onclick="goToLogin()" class="txt2">
-    Go back to login
-  <i class="fa fa-long-arrow-left m-l-5" aria-hidden="true"></i>
-</a>
-</div>
-				</form>
-`;
-$("form")[0].id = "create-ticket-form";
-prepareTicketForm();
-}
-
-
-
-
-
-
-
-function goToLogin(){
-	$("form")[0].innerHTML= `
-	${csrf_middleware_token.outerHTML}
-	<span class="hidden-login-title"> Login </span>
-
-  <div class="wrap-input100 validate-input" data-validate="Valid username is required">
-    <input class="input100" type="text" name="username" placeholder="Username">
-    <span class="focus-input100"></span>
-    <span class="symbol-input100">
-      <i class="fa fa-user" aria-hidden="true"></i>
-    </span>
-  </div>
-
-  <div class="wrap-input100 validate-input" data-validate="Password is required">
-    <input class="input100" type="password" name="password" placeholder="Password">
-    <span class="focus-input100"></span>
-    <span class="symbol-input100">
-      <i class="fa fa-lock" aria-hidden="true"></i>
-    </span>
-  </div>
-
-  <span class="myform100-form-title" style="font-size: 12px; color: red; text-align: center; padding: 5px" id="login_error"></span>
-
-  <div class="container-myform100-form-btn">
-    <button type="submit" class="myform100-form-btn" id="login">Login</button>
-  </div>
-
-  <div class="text-center p-t-12">
-    <span class="txt1"> Forgot </span>
-    <a onclick="recoverPassword()" class="txt2" href="#forgotpassword">
-      Password?
-    </a>
-  </div>
-
-  <div class="text-center p-t-100">
-    <a onclick="requestAccess()" class="txt2" href="#requestaccess">
-        Request access/ report an issue
-      <i class="fa fa-long-arrow-right m-l-5" aria-hidden="true"></i>
-    </a>
-  </div>
-	`
-
-  // front end bug fix for login view: padding change
-  function applyClassReplacement() {
-    var element = document.getElementsByClassName("hidden-login-title")[0];
-    element.classList.replace("hidden-login-title", "myform100-form-title");
-  }
-  setTimeout(applyClassReplacement, 0);
-
-    setupFormValidation('.validate-form', '.input100', '#login', function() {
-      // Callback function to handle form submission
-      submitLoginForm();
+    // Clear validation on input
+    form.querySelectorAll('.sg-input').forEach(inp => {
+        inp.addEventListener('input', function() {
+            const field = this.closest('.sg-field');
+            if (field) field.classList.remove('invalid');
+        });
     });
-    
-  }
-
-let csrf_middleware_token = document.getElementsByName("csrfmiddlewaretoken")[0];
-
-
-
+})();
 
 function submitLoginForm() {
-	var form = $("form")[0];
-  var formData = new FormData(form);
+    const form = document.getElementById('login-form');
+    const fd = new FormData(form);
 
-    $.ajax({
-		url: '../xloginapi/', 
-		type: 'POST', 
-		data: formData,
-		processData: false,
-		contentType: false,
-		success: function(response) {
-			console.log('Logged in successfully', response);
-			window.open("../","_self");
-		},
-		error: function(xhr, status) {
-			console.error('Could not login you in with provided credentials. Status:', status, 'Response:', xhr.responseText);
-			document.getElementById("login_error").innerText = "Could not log you in with the provided credentials";
-			
-		}
-	});
+    fetch('../xloginapi/', { method: 'POST', body: fd })
+        .then(r => {
+            if (!r.ok) throw new Error('Login failed');
+            return r.json();
+        })
+        .then(() => { window.location.href = '../'; })
+        .catch(err => {
+            showError('login_error', 'Could not log you in with the provided credentials');
+        });
 }
 
-// pasword reset request ticket logged
+/* ─────────────────────────────────────────
+   Inline form swaps (login page)
+───────────────────────────────────────── */
+function showForgotPassword() {
+    const card = document.getElementById('sg-main-card');
+    if (!card) return;
+
+    card.querySelector('.sg-card-header .sg-card-title').textContent = 'Forgot Password';
+    card.querySelector('.sg-card-header .sg-card-subtitle').textContent = 'Enter your details and we\'ll get back to you';
+
+    card.querySelector('.sg-card-body').innerHTML = `
+        <input type="hidden" name="csrfmiddlewaretoken" value="${csrf()}"/>
+        <div class="sg-field" id="field-username">
+            <div class="sg-input-wrap">
+                <span class="sg-input-icon">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M2 14c0-3.314 2.686-5 6-5s6 1.686 6 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </span>
+                <input class="sg-input" type="text" name="username" placeholder="Username"/>
+            </div>
+        </div>
+        <div class="sg-field" id="field-email">
+            <div class="sg-input-wrap">
+                <span class="sg-input-icon">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 6l6 4 6-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </span>
+                <input class="sg-input" type="text" name="email" placeholder="Email"/>
+            </div>
+        </div>
+        <span class="sg-error" id="forgot-error"></span>
+        <span class="sg-success" id="forgot-success"></span>
+        <button type="button" class="sg-btn" id="password-reset" onclick="submitPassResetForm()">Send Reset Request</button>
+    `;
+
+    card.querySelector('.sg-card-footer').innerHTML = `
+        <a href="#login" onclick="goToLogin()" class="sg-link">← Back to login</a>
+    `;
+}
+
+function showRequestAccess() {
+    const card = document.getElementById('sg-main-card');
+    if (!card) return;
+
+    card.querySelector('.sg-card-header .sg-card-title').textContent = 'Request Access';
+    card.querySelector('.sg-card-header .sg-card-subtitle').textContent = 'Enter your details and we\'ll get back to you';
+
+    card.querySelector('.sg-card-body').innerHTML = `
+        <input type="hidden" name="csrfmiddlewaretoken" value="${csrf()}"/>
+        <select class="sg-select" name="ticket_type" style="margin-bottom:4px">
+            <option value="" disabled selected>Choose category</option>
+            <option value="incident">Report an issue</option>
+            <option value="request">Request access</option>
+        </select>
+        <textarea class="sg-textarea" name="description" placeholder="Describe your request…"></textarea>
+        <div class="sg-field" id="field-email">
+            <div class="sg-input-wrap">
+                <span class="sg-input-icon">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 6l6 4 6-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </span>
+                <input class="sg-input" type="email" name="email" placeholder="Email"/>
+            </div>
+        </div>
+        <span class="sg-error"   id="access-error"></span>
+        <span class="sg-success" id="access-success"></span>
+        <button type="button" class="sg-btn" onclick="submitAccessForm()">Send Request</button>
+    `;
+
+    card.querySelector('.sg-card-footer').innerHTML = `
+        <a href="#login" onclick="goToLogin()" class="sg-link">← Back to login</a>
+    `;
+}
+
+function goToLogin() {
+    window.location.reload();
+}
+
+/* ─────────────────────────────────────────
+   Password reset request
+───────────────────────────────────────── */
 function submitPassResetForm() {
-	var form = $("form")[0];
-  var formData = new FormData(form);
+    const body = document.querySelector('.sg-card-body');
+    const fd = new FormData();
+    fd.append('csrfmiddlewaretoken', csrf());
+    fd.append('username', (body.querySelector('[name="username"]') || {}).value || '');
+    fd.append('email', (body.querySelector('[name="email"]') || {}).value || '');
 
-    $.ajax({
-		url: '/password_reset_request/', 
-		type: 'POST', 
-		data: formData,
-		processData: false,
-		contentType: false,
-		success: function(response) {
-			
-      if (response.error){
-        document.getElementById("password-reset").parentElement.outerHTML = `
-        <span class="myform100-form-title" 
-        style="font-size: 12px; 
-        color: red; 
-        text-align: center; 
-        padding: 5px"">${response.error}</span> ${document.getElementById("password-reset").parentElement.outerHTML}
-        `;
-      } else if (response.status===200){
-        console.log(response.message);
-        document.getElementsByTagName("form")[0].
-        outerHTML = `<form class="myform100-form validate-form">
-                        <span class="myform100-form-title" style="
-                          padding-bottom: 20px; color:green
-                      ">Request Successful!</span><span class="myform100-form-title" style="
-                          font-size: 11px;
-                          color: #4343f1;
-                          text-align: center;
-                          padding-bottom: 30px;
-                      "> ${response.message} </span>
-                      <span class="myform100-form-title" style="
-                      font-size: 11px;
-                      color: #4343f1;
-                      text-align: center;
-                      padding-bottom: 30px;
-                    ">We will get back to you as soon as possible.</span>
-
-                    <div class="text-center p-t-100">
-                        <a onclick="goToLogin()" class="txt2" href="#login">
-                          Go back to login	
-                          <i class="fa fa-long-arrow-left m-l-5" aria-hidden="true"></i>
-                          </a>
-                          </div>
-                  </form>`
-                    }
-		},
-		error: function(xhr, status) {
-			document.getElementById("password-reset").parentElement.outerHTML = `
-        <span class="myform100-form-title" 
-        style="font-size: 12px; 
-        color: red; 
-        text-align: center; 
-        padding: 5px">Error ${status} : ${xhr.responseText}</span> ${document.getElementById("password-reset").parentElement.outerHTML}
-        `;
-		}
-	});
+    fetch('/password_reset_request/', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 200) {
+                hideError('forgot-error');
+                showError('forgot-success', data.message || 'Check your email for reset instructions.');
+                document.getElementById('forgot-success').classList.add('visible');
+                document.getElementById('forgot-success').style.display = 'block';
+            } else {
+                showError('forgot-error', data.error || 'Could not submit request.');
+            }
+        })
+        .catch(() => showError('forgot-error', 'Server error. Please try again.'));
 }
 
+function submitAccessForm() {
+    const body = document.querySelector('.sg-card-body');
+    const fd = new FormData();
+    fd.append('csrfmiddlewaretoken', csrf());
+    fd.append('ticket_type', (body.querySelector('[name="ticket_type"]') || {}).value || '');
+    fd.append('description', (body.querySelector('[name="description"]') || {}).value || '');
+    fd.append('email', (body.querySelector('[name="email"]') || {}).value || '');
 
-async function clearAllCookies() {
-  return new Promise((resolve, reject) => {
-    var cookies = document.cookie.split(";");
-    var cookiePromises = [];
-
-    for (var i = 0; i < cookies.length; i++) {
-      var cookie = cookies[i];
-      var eqPos = cookie.indexOf("=");
-      var name = eqPos > -1 ? cookie.substr(0, eqPos) : cookie;
-      var cookiePromise = new Promise((resolve, reject) => {
-        document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
-        resolve();
-      });
-      cookiePromises.push(cookiePromise);
-    }
-
-    Promise.all(cookiePromises)
-      .then(() => {
-        resolve();
-      })
-      .catch((error) => {
-        reject(error);
-      });
-  });
+    fetch('/log_ticket/', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(data => {
+            const s = document.getElementById('access-success');
+            if (s) { s.textContent = data.message || 'Request submitted!'; s.classList.add('visible'); }
+        })
+        .catch(() => showError('access-error', 'Could not submit. Please try again.'));
 }
 
-
+/* ─────────────────────────────────────────
+   Logout
+───────────────────────────────────────── */
 function submitLogout() {
-  var form = $("form")[0];
-  var formData = new FormData(form);
+    const fd = new FormData();
+    fd.append('csrfmiddlewaretoken', csrf());
 
-  $.ajax({
-    url: '/xlogoutapi/',
-    type: 'POST',
-    data: formData,
-		processData: false,
-		contentType: false,
-    success: function (response) {
-      console.log('Logged out successfully');
-      clearAllCookies();
-      window.location.href = "/auth"; 
-    },
-    error: function (xhr, status) {
-      console.error('Could not logout. Status:', status, 'Response:', xhr.responseText);
-      clearAllCookies();
-    }
-  });
+    fetch('/xlogoutapi/', { method: 'POST', body: fd })
+        .then(() => { window.location.href = '/auth'; })
+        .catch(() => { window.location.href = '/auth'; });
 }
 
-
-
+/* ─────────────────────────────────────────
+   Ticket form (logaticket page)
+───────────────────────────────────────── */
+function prepareTicketForm() {
+    // Legacy call — ticket form now has its own submit handler in the template
+}

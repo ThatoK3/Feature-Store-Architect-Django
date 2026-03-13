@@ -1,21 +1,18 @@
-{% extends 'SecureGate/base.html' %} {% block content %}
-<form class="myform100-form validate-form">
-  {% csrf_token %}
-
-  <div
-    class="myform100-form-title"
-    style="color: #931717; padding-bottom: 180px"
-  >
-    <i class="fa fa-exclamation-triangle m-l-5" aria-hidden="true"></i><br />
-    You do not have access to this application
-  </div>
-
-  <div class="text-center p-t-136">
-    <a onclick="" class="txt2" href="../" style="">
-      Go to appications page
-      <i class="fa fa-long-arrow-left m-l-5" aria-hidden="true"></i>
-    </a>
-  </div>
-</form>
-
-{%endblock%}
+{% extends 'SecureGate/base.html' %}
+{% block content %}
+<div class="sg-card">
+    <div class="sg-status-page">
+        <div class="sg-status-icon error">🚫</div>
+        <div class="sg-status-title">Access Denied</div>
+        <div class="sg-status-text">You don't have permission to access this application. Contact your administrator or submit a request.</div>
+        <div style="display:flex;gap:10px;margin-top:8px;width:100%">
+            <a href="/" class="sg-btn sg-btn-ghost" style="display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none">
+                ← Applications
+            </a>
+            <a href="./logaticket" class="sg-btn" style="display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none">
+                Request Access
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

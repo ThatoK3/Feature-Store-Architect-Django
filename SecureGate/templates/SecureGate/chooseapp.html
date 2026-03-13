@@ -1,232 +1,152 @@
 {% extends 'SecureGate/base.html' %}
 
 {% block topnav %}
-<nav class="text-on-line">
-  <div class="nav-brand-image">
-    <span>
-      <a href="/">DataSenseHub</a>
-    </span>
-  </div>
-  <span class="nav-brand">
-    <h3></h3>
-  </span>
-  <ul class="links-container">
-    <li class="nav-username">
-      <span>Welcome, {{ username }}!</span>
-    </li>
-    <li class="link" onclick="submitLogout()"><a>Logout</a></li>
-  </ul>
+<nav class="sg-nav">
+    <div class="sg-nav-brand">
+        <div class="sg-nav-dot"></div>
+        DataSenseHub
+    </div>
+    <div class="sg-nav-right">
+        <span class="sg-nav-user">Welcome, {{ username }}</span>
+        <button class="sg-nav-btn" onclick="submitLogout()">Sign out</button>
+    </div>
 </nav>
 {% endblock %}
 
 {% block content %}
-<form class="myform100-form">
-  {% csrf_token %}
+<div class="sg-card sg-card-wide" style="animation: card-in 0.4s cubic-bezier(0.34,1.56,0.64,1);">
 
-  <div class="app-selector-wrapper" style="margin-bottom: 25px; position: relative;">
-    <div class="custom-select" id="customSelect" style="position: relative;">
-      <div class="select-trigger input" id="selectTrigger" style="cursor: pointer; padding: 8px 12px; background: #f7e9f6; border-radius: 9px; border: 1px solid #ccc;">
-        Choose application
-      </div>
-      <div class="select-options" id="selectOptions" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #ccc; border-radius: 9px; margin-top: 4px; max-height: 200px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
-      </div>
+    <div class="sg-card-header">
+        <div class="sg-card-logo">⚡</div>
+        <div class="sg-card-title">Choose Application</div>
+        <div class="sg-card-subtitle">Open an existing repository or start something new</div>
     </div>
-    
-    <select name="application-name" id="appSelector" style="display: none;">
-      <option value="" selected disabled>Choose application</option>
-    </select>
-    
-    <div id="appTooltip" class="app-hover-tooltip" style="display: none; position: absolute; right: 100%; top: 50px; width: 300px; margin-right: 20px; background: #fff; border: 1px solid #004b8d; border-radius: 10px; padding: 15px; box-shadow: 0 8px 25px rgba(0,75,141,0.25); z-index: 100;">
-      <h4 id="tooltipName" style="margin: 0 0 8px 0; color: #004b8d; font-size: 15px; font-weight: 600; border-bottom: 2px solid #cadeff; padding-bottom: 8px;"></h4>
-      <p id="tooltipDesc" style="margin: 0 0 10px 0; color: #444; font-size: 12px; line-height: 1.4; max-height: 150px; overflow-y: auto;"></p>
-      <div id="tooltipMeta" style="font-size: 11px; color: #666; background: #f5f8ff; padding: 8px; border-radius: 6px; margin-top: 8px;">
-      </div>
+
+    <!-- Quick actions -->
+    <div class="sg-app-grid">
+        <button class="sg-action-card" onclick="openNewRepo()">
+            <div class="sg-action-icon green">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </div>
+            <div>
+                <div class="sg-action-label">Create Repository</div>
+                <div class="sg-action-desc">Start with a blank feature store</div>
+            </div>
+        </button>
+
+        <button class="sg-action-card" onclick="openExample()">
+            <div class="sg-action-icon blue">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="3" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="11" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="11" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>
+            </div>
+            <div>
+                <div class="sg-action-label">Open Example</div>
+                <div class="sg-action-desc">Explore a sample architecture</div>
+            </div>
+        </button>
+
+        <a class="sg-action-card" href="./logaticket">
+            <div class="sg-action-icon purple">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M17 10a7 7 0 11-14 0 7 7 0 0114 0z" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </div>
+            <div>
+                <div class="sg-action-label">Request Access</div>
+                <div class="sg-action-desc">Report an issue or get help</div>
+            </div>
+        </a>
     </div>
-  </div>
 
-  <div class="container-myform100-form-btn">
-    <button type="button" id="openAppBtn" style="margin-bottom: 80px; margin-top: 30px" class="myform100-form-btn" onclick="openApplication()" disabled>
-      Open Application
-    </button>
-  </div>
+    <!-- Existing repos -->
+    <div class="sg-section-label">Your Repositories</div>
 
-  <div class="text-center p-t-136">
-    <a onclick="" class="txt2" href="./logaticket">
-      Request access/ report an issue
-      <i class="fa fa-long-arrow-right m-l-5" aria-hidden="true"></i>
-    </a>
-  </div>
-</form>
+    <div class="sg-repo-list" id="repoList">
+        <div class="sg-repo-state" id="repoLoading">
+            <div class="sg-spinner"></div>
+            <span>Loading repositories…</span>
+        </div>
+    </div>
 
-<style>
-  .custom-select .option { padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 14px; color: #333; }
-  .custom-select .option:hover { background: #cadeff; color: #004b8d; }
-  .custom-select .option:last-child { border-bottom: none; }
-  .custom-select .option.selected { background: #004b8d; color: #fff; }
-</style>
+    <div class="sg-app-footer">
+        {% csrf_token %}
+        <button class="sg-open-btn" id="openAppBtn" onclick="openSelected()" disabled>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Open Application
+        </button>
+    </div>
 
-<script>
-let applicationsData = [];
-let selectedAppId = null;
-let isDropdownOpen = false;
-
-document.addEventListener('DOMContentLoaded', function() {
-  fetchApplications();
-  setupCustomSelect();
-});
-
-function fetchApplications() {
-  fetch('/api/repositories')
-    .then(response => {
-      if (!response.ok) throw new Error('Failed to fetch');
-      return response.json();
-    })
-    .then(data => {
-      applicationsData = Array.isArray(data) ? data : (data.data || []);
-      populateCustomSelect(applicationsData);
-      populateHiddenSelect(applicationsData);
-    })
-    .catch(error => {
-      console.error('Error:', error);
-      document.getElementById('selectTrigger').textContent = 'Error loading applications';
-    });
-}
-
-function populateHiddenSelect(apps) {
-  const selector = document.getElementById('appSelector');
-  selector.innerHTML = '<option value="" selected disabled>Choose application</option>';
-  apps.forEach(app => {
-    const option = document.createElement('option');
-    option.value = app.id;
-    option.textContent = app.name;
-    selector.appendChild(option);
-  });
-}
-
-function populateCustomSelect(apps) {
-  const optionsContainer = document.getElementById('selectOptions');
-  optionsContainer.innerHTML = '';
-  
-  apps.forEach(app => {
-    const div = document.createElement('div');
-    div.className = 'option';
-    div.dataset.value = app.id;
-    div.textContent = app.name;
-    
-    // Hover always updates tooltip
-    div.addEventListener('mouseenter', function() {
-      showTooltip(app);
-    });
-    
-    div.addEventListener('click', function(e) {
-      e.stopPropagation();
-      selectApp(app.id, app.name);
-    });
-    
-    optionsContainer.appendChild(div);
-  });
-}
-
-function setupCustomSelect() {
-  const trigger = document.getElementById('selectTrigger');
-  const options = document.getElementById('selectOptions');
-  
-  trigger.addEventListener('click', function(e) {
-    e.stopPropagation();
-    isDropdownOpen = !isDropdownOpen;
-    options.style.display = isDropdownOpen ? 'block' : 'none';
-    trigger.style.borderColor = isDropdownOpen ? '#004b8d' : '#ccc';
-    
-    // When opening dropdown, show currently selected app or first app
-    if (isDropdownOpen) {
-      if (selectedAppId) {
-        const currentApp = applicationsData.find(a => String(a.id) === selectedAppId);
-        if (currentApp) showTooltip(currentApp);
-      } else if (applicationsData.length > 0) {
-        showTooltip(applicationsData[0]);
-      }
-    }
-  });
-  
-  // Click outside handler
-  document.addEventListener('click', function(e) {
-    const wrapper = document.querySelector('.app-selector-wrapper');
-    
-    // If click is outside the entire wrapper (select + tooltip area)
-    if (!wrapper.contains(e.target)) {
-      // Close dropdown
-      isDropdownOpen = false;
-      options.style.display = 'none';
-      trigger.style.borderColor = '#ccc';
-      
-      // Always hide tooltip when clicking completely outside
-      hideTooltip();
-    }
-  });
-}
-
-function selectApp(appId, appName) {
-  selectedAppId = appId;
-  
-  document.getElementById('selectTrigger').textContent = appName;
-  document.getElementById('appSelector').value = appId;
-  document.getElementById('openAppBtn').disabled = false;
-  
-  const selectedApp = applicationsData.find(a => String(a.id) === appId);
-  if (selectedApp) showTooltip(selectedApp);
-  
-  isDropdownOpen = false;
-  document.getElementById('selectOptions').style.display = 'none';
-  
-  document.querySelectorAll('.custom-select .option').forEach(opt => {
-    opt.classList.toggle('selected', opt.dataset.value === String(appId));
-  });
-}
-
-function showTooltip(app) {
-  const tooltip = document.getElementById('appTooltip');
-  document.getElementById('tooltipName').textContent = app.name || 'Unknown';
-  document.getElementById('tooltipDesc').textContent = truncateText(app.description || 'No description available', 300);
-  
-  let metaHtml = '';
-  if (app.default_owner) metaHtml += `<div style="margin-bottom: 4px;"><i class="fa fa-user" style="color: #004b8d; width: 16px;"></i> ${escapeHtml(app.default_owner)}</div>`;
-  if (app.created_at) metaHtml += `<div style="margin-bottom: 4px;"><i class="fa fa-calendar" style="color: #004b8d; width: 16px;"></i> ${new Date(app.created_at).toLocaleDateString()}</div>`;
-  if (app.node_count !== undefined) metaHtml += `<div><i class="fa fa-sitemap" style="color: #004b8d; width: 16px;"></i> ${app.node_count} entities, ${app.edge_count || 0} edges</div>`;
-  if (app.location) metaHtml += `<div style="margin-top: 6px; font-size: 10px; color: #888; word-break: break-all;"><i class="fa fa-folder" style="color: #004b8d; width: 16px;"></i> ${escapeHtml(app.location)}</div>`;
-  
-  document.getElementById('tooltipMeta').innerHTML = metaHtml;
-  tooltip.style.display = 'block';
-}
-
-function hideTooltip() {
-  document.getElementById('appTooltip').style.display = 'none';
-}
-
-function openApplication() {
-  if (!selectedAppId) return;
-  window.open(`/ui/feast?repo_id=${encodeURIComponent(selectedAppId)}`, '_blank');
-}
-
-function truncateText(text, maxLength) {
-  if (!text || text.length <= maxLength) return text;
-  return text.substring(0, maxLength).trim() + '...';
-}
-
-function escapeHtml(text) {
-  if (!text) return '';
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-</script>
+</div>
 {% endblock %}
 
 {% block custom_script %}
 <script>
-  document.getElementById("dsy-logo").classList.add("rotate");
-  setTimeout(function () {
-    document.getElementById("dsy-logo").classList.remove("rotate");
-  }, 5000);
+let repos = [];
+let selectedId = null;
+
+document.addEventListener('DOMContentLoaded', fetchRepos);
+
+function fetchRepos() {
+    fetch('/api/repositories')
+        .then(r => { if (!r.ok) throw new Error('Failed'); return r.json(); })
+        .then(data => {
+            repos = Array.isArray(data) ? data : (data.data || []);
+            renderRepos(repos);
+        })
+        .catch(() => {
+            document.getElementById('repoList').innerHTML = `
+                <div class="sg-repo-state">
+                    <span style="font-size:20px">📭</span>
+                    <span>No repositories found</span>
+                </div>`;
+        });
+}
+
+function renderRepos(list) {
+    const el = document.getElementById('repoList');
+    if (!list.length) {
+        el.innerHTML = `<div class="sg-repo-state"><span style="font-size:20px">📭</span><span>No repositories yet — create one above</span></div>`;
+        return;
+    }
+    el.innerHTML = list.map(r => {
+        const date  = r.created_at ? new Date(r.created_at).toLocaleDateString() : '';
+        const nodes = r.node_count != null ? `${r.node_count} nodes` : '';
+        const owner = r.default_owner || '';
+        const meta  = [nodes, owner, date].filter(Boolean).join(' · ');
+        return `
+        <div class="sg-repo-card" data-id="${r.id}" onclick="selectRepo('${r.id}', this)">
+            <div class="sg-repo-icon">🗄️</div>
+            <div class="sg-repo-info">
+                <div class="sg-repo-name">${escapeHtml(r.name)}</div>
+                ${meta ? `<div class="sg-repo-meta">${escapeHtml(meta)}</div>` : ''}
+            </div>
+            <div class="sg-repo-check">✓</div>
+        </div>`;
+    }).join('');
+}
+
+function selectRepo(id, el) {
+    selectedId = id;
+    document.querySelectorAll('.sg-repo-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    document.getElementById('openAppBtn').disabled = false;
+}
+
+function openSelected() {
+    if (!selectedId) return;
+    window.location.href = `/ui/feast?repo_id=${encodeURIComponent(selectedId)}`;
+}
+
+function openNewRepo() {
+    window.location.href = '/ui/feast?new';
+}
+
+function openExample() {
+    window.location.href = '/ui/feast';
+}
+
+function escapeHtml(t) {
+    if (!t) return '';
+    const d = document.createElement('div');
+    d.textContent = t;
+    return d.innerHTML;
+}
 </script>
-<script src="static/js/logTicket.js"></script>
 {% endblock %}

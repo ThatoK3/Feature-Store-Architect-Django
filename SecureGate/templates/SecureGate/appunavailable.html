@@ -1,21 +1,13 @@
-{% extends 'SecureGate/base.html' %}{% block content %}
-<form class="myform100-form validate-form">
-  {% csrf_token %}
-
-  <div
-    class="myform100-form-title"
-    style="color: #931717; padding-bottom: 180px"
-  >
-    <i class="fa fa-exclamation-triangle m-l-5" aria-hidden="true"></i><br />
-    This application is currently not available
-  </div>
-
-  <div class="text-center p-t-136">
-    <a onclick="" class="txt2" href="../" style="">
-      Go to appications page
-      <i class="fa fa-long-arrow-left m-l-5" aria-hidden="true"></i>
-    </a>
-  </div>
-</form>
-
-{%endblock%}
+{% extends 'SecureGate/base.html' %}
+{% block content %}
+<div class="sg-card">
+    <div class="sg-status-page">
+        <div class="sg-status-icon warning">⚠️</div>
+        <div class="sg-status-title">Application Unavailable</div>
+        <div class="sg-status-text">This application is temporarily unavailable. Please try again later or contact support.</div>
+        <a href="/" class="sg-btn" style="display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;margin-top:8px">
+            ← Back to Applications
+        </a>
+    </div>
+</div>
+{% endblock %}

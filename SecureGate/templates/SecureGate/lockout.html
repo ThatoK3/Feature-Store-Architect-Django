@@ -1,68 +1,28 @@
 <!DOCTYPE html>
-<html lang="en"><head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lockout</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f2f2f2;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-        .lockout-container {
-            text-align: center;
-        }
-        h1 {
-            color: #333;
-        }
-        p {
-            color: #666;
-            margin-bottom: 20px;
-        }
-        .lockout-image {
-            position: relative;
-            width: 100px;
-            height: 100px;
-            background-color: red;
-            border-radius: 50%;
-            text-align: center;
-            line-height: 180px;
-            color: white;
-            font-size: 80px;
-            margin-bottom: 20px;
-	    padding: 50px 65px 50px 65px;
-        }
-        .lockout-link {
-            color: #007bff;
-            text-decoration: none;
-            font-weight: bold;
-        }
-        .lockout-link:hover {
-            text-decoration: underline;
-        }
-        .ban{
-            font-weight: bold;
-            color:#cca4a4;
-            background: white;
-            border-radius: 15%;
-        }   
-    </style>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Access Locked — DataSenseHub</title>
+    <link rel="stylesheet" href="/static/SecureGate/css/auth.css"/>
 </head>
 <body>
-    <div class="lockout-container">
-        <span class="lockout-image" src="lockout.png" alt="Lockout Image">X</span>
-        <h1>Access Denied</h1>
-        <p>Your access has been temporarily locked out due to suspicious behaviour.</p>
-        <p>Please contact support for assistance.</p>
-        
-        <a class="lockout-link" href="mailto:ThatoJoe@outlook.com">Contact Support</a>
-
-        <p class="ban">Please try to access this site after an hour</p>
+<div class="sg-lockout">
+    <div class="sg-card" style="max-width:400px">
+        <div class="sg-status-page">
+            <div class="sg-status-icon error" style="width:72px;height:72px;font-size:32px">🔒</div>
+            <div class="sg-status-title">Account Locked</div>
+            <div class="sg-status-text">
+                Your access has been temporarily suspended due to suspicious activity.
+                Please wait one hour or contact support.
+            </div>
+            <a href="mailto:support@datasensehub.com" class="sg-btn"
+               style="display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;margin-top:8px">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 6l6 4 6-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                Contact Support
+            </a>
+        </div>
     </div>
-
-</body></html>
+</div>
+</body>
+</html>
