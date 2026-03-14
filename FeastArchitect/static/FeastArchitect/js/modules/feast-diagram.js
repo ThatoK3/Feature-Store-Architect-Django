@@ -87,7 +87,7 @@ class FeastDiagram {
         this.ui = new UIManager();
         this.api = new APIClient('/api');
         this.codeGen = new CodeGenerator(this.getRepoSettings());
-        this.llm = new LLMHelper(this.api, this.getRepoSettings());
+        this.llm = new LLMHelper(this.api, () => this.repoSettings);
         this.search = new SearchManager();
         this.layout = new LayoutManager();
         

@@ -6,11 +6,17 @@
  */
 
 class LLMHelper {
-    constructor(apiClient, repoSettings) {
-        this.api          = apiClient;
-        this.repoSettings = repoSettings;
+    constructor(apiClient, getRepoSettings) {
+        this.api              = apiClient;
+        this._getRepoSettings = typeof getRepoSettings === 'function'
+            ? getRepoSettings
+            : () => getRepoSettings;
         this.sessionId    = null;
         this.container    = null;
+    }
+
+    get repoSettings() {
+        return this._getRepoSettings();
     }
 
     initialize() {
