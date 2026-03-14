@@ -11,7 +11,12 @@ from dataclasses import dataclass, field, asdict
 
 try:
     from dotenv import load_dotenv
-    load_dotenv()
+    # Search from this file's directory upward so .env is found
+    # regardless of where Django's working directory is
+    _here = os.path.dirname(os.path.abspath(__file__))
+    load_dotenv(os.path.join(_here, '..', '.env'))  # project root
+    load_dotenv(os.path.join(_here, '.env'))        # app dir fallback
+    load_dotenv()                                    # cwd fallback
 except ImportError:
     pass
 
@@ -181,10 +186,15 @@ class GroqLLMClient:
 
     def __init__(self, api_key: Optional[str] = None):
         if not GROQ_AVAILABLE:
-            raise RuntimeError("Install groq: pip install groq")
+            raise RuntimeError(
+                "groq package not installed. Run: pip install groq"
+            )
         self.api_key = api_key or os.environ.get("GROQ_API_KEY")
         if not self.api_key:
-            raise RuntimeError("GROQ_API_KEY not set")
+            raise RuntimeError(
+                "GROQ_API_KEY not found. Checked environment and .env file. "
+                f"Env vars present: {[k for k in os.environ if 'GROQ' in k or 'API' in k]}"
+            )
         self.client = Groq(api_key=self.api_key)
 
     def query(
