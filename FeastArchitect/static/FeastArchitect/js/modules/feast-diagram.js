@@ -1046,7 +1046,7 @@ class FeastDiagram {
             }
         });
         
-        const colWidth = 340;
+        const colWidth = 360;
         const rowHeight = 140;
         const startX = 120;
         const startY = 120;
@@ -1191,6 +1191,7 @@ class FeastDiagram {
             // Load architecture
             if (data.architecture_json) {
                 this.nodes.importFromJSON(data.architecture_json);
+                this.autoLayout();  // reposition with current spacing
             }
             
             // Load backend entities as nodes if empty

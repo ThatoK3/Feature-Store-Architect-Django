@@ -21,7 +21,7 @@ class LayoutManager {
      */
     constructor(config = {}) {
         this.config = {
-            colWidth: 340,
+            colWidth: 360,
             rowHeight: 140,
             startX: 120,
             startY: 120,
