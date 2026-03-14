@@ -4353,38 +4353,64 @@ class FeastDiagram {
 
         generateCodeExample(node) {
         if (node.type === 'featureview') {
-            return `<span class="code-comment"># Retrieve features from ${node.name}</span>
-    <span class="code-keyword">from</span> feast <span class="code-keyword">import</span> FeatureStore
-    
-    store = FeatureStore(repo_path=<span class="code-string">"${this.repoSettings.location}"</span>)
-    
-    features = store.get_online_features(
-        features=[
-${node.features.slice(0, 2).map(f => `<span class="code-string">"${node.name}:${f.name}"</span>`).join(',\n        ')}${node.features.length > 2 ? ',' : ''}
-        ],
-        entity_rows=[{<span class="code-string">"${this.nodes.nodes.get(node.entities[0])?.joinKey || 'id'}"</span>: <span class="code-string">"123"</span>}]
-    ).to_df()`;
+            const entityKey = this.nodes.nodes.get(node.entities?.[0])?.joinKey || 'id';
+            const featLines = node.features.slice(0, 2)
+                .map(f => `    <span class="code-string">"${node.name}:${f.name}"</span>`)
+                .join(',\n');
+            const more = node.features.length > 2 ? ',' : '';
+            return [
+                `<span class="code-comment"># Retrieve features from ${node.name}</span>`,
+                `<span class="code-keyword">from</span> feast <span class="code-keyword">import</span> FeatureStore`,
+                ``,
+                `store = FeatureStore(repo_path=<span class="code-string">"${this.repoSettings.location}"</span>)`,
+                ``,
+                `features = store.get_online_features(`,
+                `    features=[`,
+                featLines + more,
+                `    ],`,
+                `    entity_rows=[{<span class="code-string">"${entityKey}"</span>: <span class="code-string">"123"</span>}]`,
+                `).to_df()`,
+            ].join('\n');
         } else if (node.type === 'service') {
-            return this._dedent(`<span class="code-comment"># Use feature service</span>
-    <span class="code-keyword">from</span> feast <span class="code-keyword">import</span> FeatureStore
-    
-    store = FeatureStore(repo_path=<span class="code-string">"${this.repoSettings.location}"</span>)
-    
-    features = store.get_online_features(
-        feature_service=<span class="code-string">"${node.name}"</span>,
-        entity_rows=[{<span class="code-string">"user_id"</span>: <span class="code-string">"123"</span>}]
-    ).to_df()`);
+            return [
+                `<span class="code-comment"># Use feature service: ${node.name}</span>`,
+                `<span class="code-keyword">from</span> feast <span class="code-keyword">import</span> FeatureStore`,
+                ``,
+                `store = FeatureStore(repo_path=<span class="code-string">"${this.repoSettings.location}"</span>)`,
+                ``,
+                `features = store.get_online_features(`,
+                `    feature_service=<span class="code-string">"${node.name}"</span>,`,
+                `    entity_rows=[{<span class="code-string">"user_id"</span>: <span class="code-string">"123"</span>}]`,
+                `).to_df()`,
+            ].join('\n');
         } else if (node.type === 'entity') {
-            return this._dedent(`<span class="code-comment"># Define entity</span>
-    <span class="code-keyword">from</span> feast <span class="code-keyword">import</span> Entity, ValueType
-    
-    <span class="code-keyword">${node.name.toLowerCase().replace(/\s+/g, '_')}</span> = Entity(
-        name=<span class="code-string">"${node.name}"</span>,
-        join_keys=[<span class="code-string">"${node.joinKey}"</span>],
-        value_type=ValueType.STRING
-    )`);
+            const varName = node.name.toLowerCase().replace(/\s+/g, '_');
+            return [
+                `<span class="code-comment"># Define entity: ${node.name}</span>`,
+                `<span class="code-keyword">from</span> feast <span class="code-keyword">import</span> Entity, ValueType`,
+                ``,
+                `${varName} = Entity(`,
+                `    name=<span class="code-string">"${node.name}"</span>,`,
+                `    join_keys=[<span class="code-string">"${node.joinKey}"</span>],`,
+                `    value_type=ValueType.STRING`,
+                `)`,
+            ].join('\n');
+        } else if (node.type === 'datasource') {
+            const varName = node.name.toLowerCase().replace(/\s+/g, '_');
+            const dbName = node.dbType ? node.dbType.name : (node.kind || 'Unknown');
+            return [
+                `<span class="code-comment"># Data source: ${node.name}</span>`,
+                `<span class="code-keyword">from</span> feast <span class="code-keyword">import</span> FileSource`,
+                ``,
+                `${varName} = FileSource(`,
+                `    name=<span class="code-string">"${node.name}"</span>,`,
+                `    <span class="code-comment"># ${dbName} — configure connection below</span>`,
+                `    path=<span class="code-string">"${node.details?.connection || 'path/to/data'}"</span>,`,
+                `    timestamp_field=<span class="code-string">"event_timestamp"</span>,`,
+                `)`,
+            ].join('\n');
         }
-        return this._dedent(`<span class="code-comment"># Component code example</span>`);
+        return `<span class="code-comment"># Select a node to see its Python API code</span>`;
     }
 
     applyUserContext() {
@@ -4776,43 +4802,46 @@ Usage:
 
     // --- generateFeatureViewCode ---
     generateFeatureViewCode(node) {
-        const varName = node.name.toLowerCase().replace(/\s+/g, '_');
+        const varName     = node.name.toLowerCase().replace(/\s+/g, '_');
         const entityNames = node.entities.map(e => {
             const entity = this.nodes.nodes.get(e);
             return entity ? entity.name.toLowerCase().replace(/\s+/g, '_') : 'entity';
         }).join(', ');
-        
-        const sourceName = node.inputs.length > 0 ? 
-            this.nodes.nodes.get(node.inputs[0])?.name?.toLowerCase().replace(/\s+/g, '_') + '_source' : 
-            'None';
-        
-        return `<span class="code-comment">"""
-${node.name} Feature View
-${'-'.repeat(node.name.length + 14)}
+        const sourceName  = node.inputs.length > 0
+            ? (this.nodes.nodes.get(node.inputs[0])?.name?.toLowerCase().replace(/\s+/g, '_') + '_source')
+            : 'None';
+        const ttl         = node.details?.ttl || '86400';
+        const schemaLines = node.features.map(f =>
+            `        Field(name=<span class="code-string">"${f.name}"</span>, dtype=${f.type})`
+        ).join(',\n');
+        const tagStr      = node.tags.length > 0
+            ? `\n    tags={${node.tags.map(t => `<span class="code-string">"${t}"</span>: <span class="code-string">""</span>`).join(', ')}},`
+            : '';
 
-Type: ${node.subtype}
-Entities: [${entityNames}]
-Features: ${node.features.length}
-TTL: ${node.details.ttl || '86400'} seconds
-
-${node.description || 'No description provided.'}
-
-Schema:
-${node.features.map(f => `    - ${f.name} (${f.type})`).join('\n')}
-"""</span>
-<span class="code-keyword">${varName}</span> = FeatureView(
-    name=<span class="code-string">"${node.name}"</span>,
-    entities=[${entityNames}],
-    ttl=timedelta(seconds=${node.details.ttl || '86400'}),
-    schema=[
-    ${node.features.map(f => `Feature(name=<span class="code-string">"${f.name}"</span>, dtype=${f.type})`).join(',\n        ')}
-    ],
-    online=True,
-    source=${sourceName}${node.tags.length > 0 ? `,
-    tags={${node.tags.map(t => `"${t}": ""`).join(', ')}}` : ''}
-)
-
-`;
+        const lines = [
+            `<span class="code-comment">"""`,
+            `${node.name}`,
+            `${'─'.repeat(node.name.length)}`,
+            `Type    : ${node.subtype}`,
+            `Entities: [${entityNames}]`,
+            `Features: ${node.features.length}`,
+            `TTL     : ${ttl}s`,
+            ``,
+            `${(node.description || 'No description.').replace(/\n/g, '\n')}`,
+            `"""</span>`,
+            `${varName} = FeatureView(`,
+            `    name=<span class="code-string">"${node.name}"</span>,`,
+            `    entities=[${entityNames}],`,
+            `    ttl=timedelta(seconds=${ttl}),`,
+            `    schema=[`,
+            schemaLines,
+            `    ],`,
+            `    online=<span class="code-keyword">True</span>,`,
+            `    source=${sourceName},${tagStr}`,
+            `)`,
+            ``,
+        ];
+        return lines.join('\n');
     }
 
     // --- generateFeatureViewsFile ---
