@@ -84,7 +84,7 @@ let selectedId = null;
 document.addEventListener('DOMContentLoaded', fetchRepos);
 
 function fetchRepos() {
-    fetch('/api/repositories')
+    fetch('/api/repositories/')
         .then(r => { if (!r.ok) throw new Error('Failed'); return r.json(); })
         .then(data => {
             repos = Array.isArray(data) ? data : (data.data || []);
