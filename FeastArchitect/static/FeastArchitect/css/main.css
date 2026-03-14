@@ -5387,3 +5387,11 @@
             border-radius: 8px;
             padding: 8px 12px;
         }
+
+        /* ── Modal action buttons row ── */
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            padding-top: 8px;
+        }
