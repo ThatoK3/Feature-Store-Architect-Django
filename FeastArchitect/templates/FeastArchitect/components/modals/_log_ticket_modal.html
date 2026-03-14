@@ -1,0 +1,40 @@
+<div class="modal-overlay" id="ticketModal" onclick="if(event.target===this)diagram.closeTicketModal()">
+    <div class="modal" style="max-width:500px;width:100%">
+        <div class="modal-header">
+            <div class="modal-title">🎫 Report Issue / Request Access</div>
+            <button class="modal-close" onclick="diagram.closeTicketModal()">✕</button>
+        </div>
+        <div class="modal-body" style="padding:24px;display:flex;flex-direction:column;gap:16px">
+
+            <div>
+                <label class="form-label">Category</label>
+                <select id="ticketType" class="form-select">
+                    <option value="" disabled selected>Choose category</option>
+                    <option value="incident">Report an issue</option>
+                    <option value="request">Request access</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="form-label">Description</label>
+                <textarea id="ticketDescription" class="form-input"
+                    style="resize:vertical;min-height:110px;line-height:1.55"
+                    placeholder="Describe your request in detail…"></textarea>
+            </div>
+
+            <div>
+                <label class="form-label">Email</label>
+                <input id="ticketEmail" type="email" class="form-input"
+                    placeholder="your@email.com"/>
+            </div>
+
+            <div id="ticketError"   class="form-error"   style="display:none"></div>
+            <div id="ticketSuccess" class="form-success" style="display:none"></div>
+
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="diagram.closeTicketModal()">Cancel</button>
+                <button class="btn btn-primary"   onclick="diagram.submitTicket()">Send Request</button>
+            </div>
+        </div>
+    </div>
+</div>
