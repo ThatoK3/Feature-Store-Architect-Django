@@ -442,7 +442,7 @@ class FeastDiagram {
         
         this.ctx.fillStyle = 'white';
         this.ctx.font = 'bold 14px Inter, sans-serif';
-        const title = this.truncateText(node.name, 22);
+        const title = this.truncateText(node.name, 26);
         this.ctx.fillText(title, node.x + 36, node.y + 22);
         
         this.ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text-primary').trim();
@@ -1046,7 +1046,7 @@ class FeastDiagram {
             }
         });
         
-        const colWidth = 280;
+        const colWidth = 340;
         const rowHeight = 140;
         const startX = 120;
         const startY = 120;
