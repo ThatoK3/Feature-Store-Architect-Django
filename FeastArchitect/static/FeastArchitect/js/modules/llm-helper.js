@@ -1,466 +1,293 @@
 /**
- * LLM Helper Module
- * 
- * Manages AI assistant functionality including chat sessions,
- * code generation, optimization suggestions, and validation.
- * 
- * File: llm-helper.js
- * Location: FeastArchitect/static/FeastArchitect/js/modules/llm-helper.js
- * 
- * @module LLMHelper
+ * LLM Helper — Feature Explorer
+ *
+ * Full conversation history, markdown+code rendering,
+ * structured ACTION block parsing for diagram interactions.
  */
 
-/**
- * LLM Assistant for Feast Architect
- * @class
- */
 class LLMHelper {
-    /**
-     * Create LLM helper instance
-     * @param {APIClient} apiClient - API client for backend communication
-     * @param {Object} repoSettings - Repository configuration
-     */
     constructor(apiClient, repoSettings) {
-        this.api = apiClient;
+        this.api          = apiClient;
         this.repoSettings = repoSettings;
-        
-        /**
-         * Current active chat session ID
-         * @type {number|null}
-         */
-        this.currentSession = null;
-        
-        /**
-         * Message history for current session
-         * @type {Array<Object>}
-         */
-        this.messageHistory = [];
-        
-        /**
-         * UI container for messages
-         * @type {HTMLElement|null}
-         */
-        this.messagesContainer = null;
+        this.sessionId    = null;
+        this.container    = null;
     }
 
-    /**
-     * Initialize LLM panel UI references
-     */
     initialize() {
-        this.messagesContainer = document.getElementById('llmMessages');
+        this.container = document.getElementById('llmMessages');
     }
 
-    /**
-     * Send a predefined prompt to the LLM
-     * @param {string} promptType - Type of prompt: 'generate_code', 'optimize', 'lineage', 'validate'
-     * @param {Object} [context] - Selected node context
-     */
-    async askPrompt(promptType, context = null) {
-        if (!this.messagesContainer) this.initialize();
+    // ── Public entry points ──────────────────────────────────
 
-        const prompts = {
-            generate_code: 'Generate Feast code for this architecture',
-            optimize: 'Suggest optimizations for my feature views',
-            lineage: 'Explain this data lineage',
-            validate: 'Validate my entity relationships'
+    async askPrompt(promptType, getDiagramContext) {
+        const labels = {
+            generate_code: 'Generate Feast Python code for this architecture',
+            optimize:      'What optimisations do you recommend for this feature store?',
+            lineage:       'Explain the data lineage from sources to services',
+            validate:      'Validate entity relationships and identify any issues',
         };
-
-        const userMessage = prompts[promptType] || promptType;
-        
-        // Add user message to UI
-        this.addMessage(userMessage, 'user');
-        
-        // Show loading indicator
-        const loadingId = this.addLoadingMessage();
-        
-        try {
-            // Try backend first
-            if (!this.currentSession) {
-                const session = await this.api.createChatSession(
-                    this.repoSettings.id,
-                    `Chat about ${this.repoSettings.name}`,
-                    userMessage,
-                    promptType
-                );
-                this.currentSession = session.id;
-                
-                // Remove loading and display response
-                this.removeMessage(loadingId);
-                
-                if (session.messages) {
-                    const lastMsg = session.messages[session.messages.length - 1];
-                    if (lastMsg && lastMsg.role === 'assistant') {
-                        const msgId = this.addMessage(lastMsg.content, 'assistant', true);
-                        this.addActionButtons(msgId);
-                    }
-                }
-            } else {
-                // Use existing session
-                const response = await this.api.sendChatMessage(
-                    this.currentSession,
-                    userMessage,
-                    promptType
-                );
-                
-                this.removeMessage(loadingId);
-                
-                if (response.response) {
-                    const msgId = this.addMessage(response.response, 'assistant', true);
-                    this.addActionButtons(msgId);
-                }
-            }
-        } catch (error) {
-            console.error('LLM query failed:', error);
-            this.removeMessage(loadingId);
-            
-            // Fallback to local generation
-            const fallbackResponse = this.generateFallbackResponse(promptType, context);
-            const msgId = this.addMessage(fallbackResponse + 
-                '<p style="color: var(--text-muted); font-size: 11px; margin-top: 8px;">[Local fallback - backend unavailable]</p>', 
-                'assistant', 
-                true
-            );
-            this.addActionButtons(msgId);
-        }
-        
-        this.scrollToBottom();
+        const msg = labels[promptType] || promptType;
+        await this._send(msg, promptType, getDiagramContext);
     }
 
-    /**
-     * Send custom message from input field
-     * @param {string} message - User message text
-     */
-    async sendMessage(message) {
-        if (!message.trim()) return;
-        if (!this.messagesContainer) this.initialize();
-
-        // Add user message
-        this.addMessage(message, 'user');
-        
-        // Clear input
+    async sendMessage(text, getDiagramContext) {
+        if (!text.trim()) return;
         const input = document.getElementById('llmInput');
-        if (input) input.value = '';
-
-        // Show loading
-        const loadingId = this.addLoadingMessage();
-
-        try {
-            if (!this.currentSession) {
-                const session = await this.api.createChatSession(
-                    this.repoSettings.id,
-                    `Chat about ${this.repoSettings.name}`,
-                    message,
-                    'default'
-                );
-                this.currentSession = session.id;
-                
-                this.removeMessage(loadingId);
-                
-                if (session.messages) {
-                    const lastMsg = session.messages[session.messages.length - 1];
-                    if (lastMsg && lastMsg.role === 'assistant') {
-                        const msgId = this.addMessage(lastMsg.content, 'assistant', true);
-                        this.addActionButtons(msgId);
-                    }
-                }
-            } else {
-                const response = await this.api.sendChatMessage(
-                    this.currentSession,
-                    message,
-                    'default'
-                );
-                
-                this.removeMessage(loadingId);
-                
-                if (response.response) {
-                    const msgId = this.addMessage(response.response, 'assistant', true);
-                    this.addActionButtons(msgId);
-                }
-            }
-        } catch (error) {
-            console.error('Send message failed:', error);
-            this.removeMessage(loadingId);
-            
-            // Fallback response
-            const fallback = `<p>I've analyzed your question about "${message}".</p>
-<p>Based on your current architecture, I recommend reviewing the data lineage from sources to services to ensure consistency.</p>`;
-            const msgId = this.addMessage(fallback, 'assistant', true);
-            this.addActionButtons(msgId);
-        }
-        
-        this.scrollToBottom();
+        if (input) { input.value = ''; input.style.height = '44px'; }
+        await this._send(text, 'default', getDiagramContext);
     }
 
+    clearSession() {
+        this.sessionId = null;
+        if (this.container) this.container.innerHTML = '';
+        if (typeof diagram !== 'undefined') diagram._llmUpdateNewChatBtn?.();
+    }
+
+    // ── Core send ────────────────────────────────────────────
+
+    async _send(message, queryType, getDiagramContext) {
+        if (!this.container) this.initialize();
+
+        const ctx = getDiagramContext ? getDiagramContext() : {};
+
+        this._appendMessage('user', message);
+        const loadingEl = this._appendLoading();
+
+        try {
+            let data;
+
+            if (!this.sessionId) {
+                // Create session
+                const res = await fetch(`${this.api.baseUrl}/chats/`, {
+                    method: 'POST',
+                    headers: this._headers(),
+                    body: JSON.stringify({
+                        repository_id:    this.repoSettings.id,
+                        title:            `Chat — ${this.repoSettings.name}`,
+                        initial_message:  message,
+                        query_type:       queryType,
+                        selected_node_id: ctx.selectedNodeId || null,
+                    }),
+                });
+                const json = await res.json();
+                if (!res.ok) throw new Error(json.detail || json.error || res.status);
+                this.sessionId = json.id;
+                if (typeof diagram !== 'undefined') diagram._llmUpdateNewChatBtn?.();
+                // The initial message response is embedded in the session
+                const msgs = json.messages || [];
+                const last = msgs.filter(m => m.role === 'assistant').pop();
+                data = { success: true, response: last?.content || '' };
+            } else {
+                // Continue session
+                const res = await fetch(`${this.api.baseUrl}/chats/${this.sessionId}/send_message/`, {
+                    method: 'POST',
+                    headers: this._headers(),
+                    body: JSON.stringify({
+                        message,
+                        query_type:       queryType,
+                        selected_node_id: ctx.selectedNodeId || null,
+                    }),
+                });
+                data = await res.json();
+                if (!res.ok) throw new Error(data.detail || data.error || res.status);
+            }
+
+            loadingEl.remove();
+
+            if (data.response) {
+                const { textContent, action } = this._parseResponse(data.response);
+                const msgEl = this._appendMessage('assistant', textContent, true);
+                if (action) this._appendActionBar(msgEl, action, getDiagramContext);
+            }
+
+        } catch (err) {
+            console.error('LLM error:', err);
+            loadingEl.remove();
+            this._appendMessage('assistant',
+                `<span style="color:var(--feast-red)">⚠ ${err.message || 'LLM unavailable'}</span>`, true);
+        }
+
+        this._scrollBottom();
+    }
+
+    // ── Response parsing ─────────────────────────────────────
+
     /**
-     * Add message to chat UI
-     * @param {string} content - Message content
-     * @param {string} role - 'user' or 'assistant'
-     * @param {boolean} isHTML - Whether content is HTML
-     * @returns {string} Message element ID
+     * Strips ```action blocks from the markdown, parses them,
+     * and returns { textContent, action }.
      */
-    addMessage(content, role, isHTML = false) {
-        const id = 'msg_' + Date.now();
+    _parseResponse(raw) {
+        let action = null;
+        const actionMatch = raw.match(/```action\s*([\s\S]*?)```/);
+        if (actionMatch) {
+            try {
+                action = JSON.parse(actionMatch[1].trim());
+            } catch(e) {
+                console.warn('Failed to parse action block:', e);
+            }
+        }
+        const textContent = raw.replace(/```action[\s\S]*?```/g, '').trim();
+        return { textContent, action };
+    }
+
+    // ── Markdown + code rendering ─────────────────────────────
+
+    _renderMarkdown(text) {
+        // Fenced code blocks
+        text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
+            const escaped = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const langLabel = lang ? `<span class="llm-code-lang">${lang}</span>` : '';
+            const copyBtn = `<button class="llm-code-copy" onclick="navigator.clipboard.writeText(this.closest('.llm-code-block').querySelector('code').innerText).then(()=>{this.textContent='✓';setTimeout(()=>this.textContent='Copy',1500)})">Copy</button>`;
+            return `<div class="llm-code-block"><div class="llm-code-header">${langLabel}${copyBtn}</div><pre><code class="lang-${lang}">${escaped}</code></pre></div>`;
+        });
+
+        // Inline code
+        text = text.replace(/`([^`]+)`/g, '<code class="llm-inline-code">$1</code>');
+
+        // Bold
+        text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+        // Headers
+        text = text.replace(/^### (.+)$/gm, '<h4 class="llm-h4">$1</h4>');
+        text = text.replace(/^## (.+)$/gm,  '<h3 class="llm-h3">$1</h3>');
+        text = text.replace(/^# (.+)$/gm,   '<h2 class="llm-h2">$1</h2>');
+
+        // Bullet lists
+        text = text.replace(/^[-*] (.+)$/gm, '<li>$1</li>');
+        text = text.replace(/(<li>[\s\S]+?<\/li>)/g, '<ul class="llm-ul">$1</ul>');
+
+        // Numbered lists
+        text = text.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+
+        // Paragraphs — wrap lone lines
+        text = text.replace(/^(?!<[hlu]|<\/[hlu]|<div|<pre)(.+)$/gm, '<p>$1</p>');
+
+        return text;
+    }
+
+    // ── Action bar ────────────────────────────────────────────
+
+    _appendActionBar(msgEl, action, getDiagramContext) {
+        if (!action || !action.type) return;
+
+        const bar = document.createElement('div');
+        bar.className = 'llm-action-bar';
+
+        if (action.type === 'highlight' && action.nodes?.length) {
+            const nodeList = action.nodes.join(', ');
+            bar.innerHTML = `
+                <span class="llm-action-hint">💡 ${action.reason || 'Related nodes found'}</span>
+                <button class="llm-action-btn llm-action-highlight"
+                    onclick="diagram._llmHighlightNodes(${JSON.stringify(action.nodes)})">
+                    Highlight ${action.nodes.length} node${action.nodes.length > 1 ? 's' : ''}
+                </button>
+            `;
+        } else if (action.type === 'select' && action.nodes?.length) {
+            bar.innerHTML = `
+                <span class="llm-action-hint">🎯 ${action.reason || 'Navigate to node'}</span>
+                <button class="llm-action-btn llm-action-select"
+                    onclick="diagram._llmSelectNode(${JSON.stringify(action.nodes[0])})">
+                    Select ${action.nodes[0]}
+                </button>
+            `;
+        } else if (action.type === 'edit_suggestion' && action.edit) {
+            const edit = action.edit;
+            bar.innerHTML = `
+                <span class="llm-action-hint">✏️ ${edit.confirm_message || 'Apply suggested change?'}</span>
+                <button class="llm-action-btn llm-action-apply"
+                    onclick="diagram._llmApplyEdit(${JSON.stringify(edit)}, this)">
+                    Apply Change
+                </button>
+                <button class="llm-action-btn llm-action-dismiss" onclick="this.closest('.llm-action-bar').remove()">
+                    Dismiss
+                </button>
+            `;
+        }
+
+        if (bar.innerHTML) msgEl.appendChild(bar);
+    }
+
+    // ── DOM helpers ───────────────────────────────────────────
+
+    _appendMessage(role, content, isHTML = false) {
+        if (!this.container) this.initialize();
         const div = document.createElement('div');
-        div.id = id;
         div.className = `llm-message ${role}`;
-        
-        if (isHTML) {
-            div.innerHTML = content;
+        if (role === 'assistant') {
+            div.innerHTML = this._renderMarkdown(isHTML ? content : this._escapeHtml(content));
         } else {
             div.textContent = content;
         }
-        
-        this.messagesContainer.appendChild(div);
-        return id;
+        this.container.appendChild(div);
+        return div;
     }
 
-    /**
-     * Add loading indicator message
-     * @returns {string} Loading element ID
-     */
-    addLoadingMessage() {
-        const id = 'loading_' + Date.now();
+    _appendLoading() {
+        if (!this.container) this.initialize();
         const div = document.createElement('div');
-        div.id = id;
-        div.className = 'llm-message assistant';
-        div.innerHTML = '<div class="spinner"></div> Analyzing your feature store...';
-        this.messagesContainer.appendChild(div);
-        return id;
-    }
-
-    /**
-     * Remove a message by ID
-     * @param {string} id - Message element ID
-     */
-    removeMessage(id) {
-        const el = document.getElementById(id);
-        if (el) el.remove();
-    }
-
-    /**
-     * Add action buttons to assistant message
-     * @param {string} messageId - Parent message ID
-     */
-    addActionButtons(messageId) {
-        const message = document.getElementById(messageId);
-        if (!message) return;
-
-        const actionsDiv = document.createElement('div');
-        actionsDiv.className = 'llm-actions';
-        actionsDiv.innerHTML = `
-            <button class="llm-action-btn" onclick="diagram.applyLLMSuggestion()">Apply to Diagram</button>
-            <button class="llm-action-btn" onclick="diagram.copyLLMResponse(this)">Copy</button>
-            <button class="llm-action-btn" onclick="diagram.dismissLLM(this)">Dismiss</button>
+        div.className = 'llm-message assistant llm-loading';
+        div.innerHTML = `
+            <div class="llm-dots">
+                <span></span><span></span><span></span>
+            </div>
+            <span class="llm-loading-text">Thinking…</span>
         `;
-        
-        message.appendChild(actionsDiv);
+        this.container.appendChild(div);
+        this._scrollBottom();
+        return div;
     }
 
-    /**
-     * Scroll messages container to bottom
-     */
-    scrollToBottom() {
-        if (this.messagesContainer) {
-            this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
-        }
+    _scrollBottom() {
+        if (this.container) this.container.scrollTop = this.container.scrollHeight;
     }
 
-    /**
-     * Update context display in LLM panel
-     * @param {Object|null} selectedNode - Currently selected node
-     * @param {Map} allNodes - All diagram nodes
-     * @param {Object} colors - Node color configuration
-     */
+    _headers() {
+        return {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': this._csrf(),
+        };
+    }
+
+    _csrf() {
+        return document.querySelector('[name=csrfmiddlewaretoken]')?.value
+            || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+    }
+
+    _escapeHtml(t) {
+        const d = document.createElement('div');
+        d.textContent = t;
+        return d.innerHTML;
+    }
+
+    // ── Context update ────────────────────────────────────────
+
     updateContext(selectedNode, allNodes, colors) {
-        const container = document.getElementById('llmContextContent');
-        if (!container) return;
+        const bar = document.getElementById('llmContextContent');
+        if (!bar) return;
 
         if (!selectedNode) {
-            // Show architecture overview
-            const stats = {
-                nodes: allNodes.size,
-                sources: Array.from(allNodes.values()).filter(n => n.type === 'datasource').length,
-                entities: Array.from(allNodes.values()).filter(n => n.type === 'entity').length,
-                views: Array.from(allNodes.values()).filter(n => n.type === 'featureview').length,
-                services: Array.from(allNodes.values()).filter(n => n.type === 'service').length
-            };
-            
-            container.innerHTML = `
-                <div class="llm-context-item">
-                    <span>📊</span>
-                    <span>Architecture Overview: ${stats.nodes} components</span>
-                </div>
-                <div class="llm-context-item">
-                    <span>🔗</span>
-                    <span>${stats.sources} sources, ${stats.entities} entities</span>
-                </div>
-                <div class="llm-context-item">
-                    <span>⚡</span>
-                    <span>${stats.views} views, ${stats.services} services</span>
-                </div>
+            const n = allNodes.size;
+            const src = Array.from(allNodes.values()).filter(x => x.type === 'datasource').length;
+            const ent = Array.from(allNodes.values()).filter(x => x.type === 'entity').length;
+            const fv  = Array.from(allNodes.values()).filter(x => x.type === 'featureview').length;
+            const svc = Array.from(allNodes.values()).filter(x => x.type === 'service').length;
+            bar.innerHTML = `
+                <span class="llm-context-icon">📊</span>
+                <span class="llm-context-text">${n} nodes — ${src} sources · ${ent} entities · ${fv} views · ${svc} services</span>
             `;
         } else {
-            // Show selected node context
-            const node = selectedNode;
-            const config = colors[node.type];
-            let icon = config.icon;
-            
-            if (node.type === 'datasource' && node.dbType && node.dbType.icon) {
-                icon = node.dbType.icon;
-            }
-            
-            let html = `
-                <div class="llm-context-item">
-                    <span>${icon}</span>
-                    <span><strong>${node.name}</strong> (${config.label})</span>
-                </div>
+            const cfg = colors[selectedNode.type] || {};
+            const icon = (selectedNode.type === 'datasource' && selectedNode.dbType?.icon)
+                ? selectedNode.dbType.icon : cfg.icon || '📦';
+            const featCount = selectedNode.features?.length ? ` · ${selectedNode.features.length} features` : '';
+            bar.innerHTML = `
+                <span class="llm-context-icon">${icon}</span>
+                <span class="llm-context-text"><strong>${selectedNode.name}</strong> (${cfg.label || selectedNode.type})${featCount}</span>
             `;
-            
-            if (node.description) {
-                html += `
-                    <div class="llm-context-item">
-                        <span>📝</span>
-                        <span>${node.description.substring(0, 60)}${node.description.length > 60 ? '...' : ''}</span>
-                    </div>
-                `;
-            }
-            
-            if (node.features) {
-                html += `
-                    <div class="llm-context-item">
-                        <span>⚡</span>
-                        <span>${node.features.length} features</span>
-                    </div>
-                `;
-            }
-            
-            if (node.entities) {
-                html += `
-                    <div class="llm-context-item">
-                        <span>👤</span>
-                        <span>${node.entities.length} entities</span>
-                    </div>
-                `;
-            }
-            
-            container.innerHTML = html;
-        }
-    }
-
-    /**
-     * Generate fallback response when backend is unavailable
-     * @param {string} type - Response type
-     * @param {Object} context - Node context
-     * @returns {string} HTML response content
-     */
-    generateFallbackResponse(type, context) {
-        switch(type) {
-            case 'generate_code':
-                return this.generateCodeResponse(context);
-            case 'optimize':
-                return this.generateOptimizeResponse(context);
-            case 'lineage':
-                return this.generateLineageResponse(context);
-            case 'validate':
-                return this.generateValidateResponse();
-            default:
-                return '<p>I\'m ready to help with your Feast architecture.</p>';
-        }
-    }
-
-    /**
-     * Generate code response
-     * @private
-     */
-    generateCodeResponse(context) {
-        if (!context) {
-            return `<p>Here's a complete Feast repository structure:</p>
-<pre>feature_repo/
-├── entities.py          # Entity definitions
-├── data_sources.py      # Data source configs
-├── feature_views.py     # Feature view definitions
-├── services.py          # Feature services
-└── feature_store.yaml   # Configuration</pre>
-<p>All files include proper docstrings and follow Feast best practices.</p>`;
-        }
-        
-        return `<p>Generated code for <strong>${context.name}</strong>:</p>
-<pre># ${context.name} configuration
-${context.type === 'featureview' ? `
-feature_view = FeatureView(
-    name="${context.name}",
-    entities=[...],
-    features=[...]
-)` : context.type === 'entity' ? `
-entity = Entity(
-    name="${context.name}",
-    join_keys=["${context.joinKey}"]
-)` : ''}
-</pre>`;
-    }
-
-    /**
-     * Generate optimization response
-     * @private
-     */
-    generateOptimizeResponse(context) {
-        if (!context) {
-            return `<p>Architecture Optimization Suggestions:</p>
-<ul style="margin-left: 20px; margin-top: 8px;">
-    <li><strong>Streaming Efficiency:</strong> Consider increasing Kafka partitions for high-throughput sources</li>
-    <li><strong>Feature TTL:</strong> Review TTL settings - some features may expire too quickly</li>
-    <li><strong>Entity Cardinality:</strong> High cardinality entities may benefit from caching</li>
-</ul>`;
-        }
-        
-        return `<p>Optimization recommendations for <strong>${context.name}</strong>:</p>
-<ul style="margin-left: 20px; margin-top: 8px;">
-    <li>Reduce feature granularity to improve serving latency</li>
-    <li>Add feature validation to catch data quality issues</li>
-    <li>Consider materialization for frequently accessed features</li>
-</ul>`;
-    }
-
-    /**
-     * Generate lineage response
-     * @private
-     */
-    generateLineageResponse(context) {
-        if (!context) {
-            return `<p>Full Data Lineage Overview:</p>
-<p>Your architecture flows from sources through feature views to services.</p>
-<p>Key lineage paths should be reviewed for consistency.</p>`;
-        }
-        
-        return `<p>Data Lineage for <strong>${context.name}</strong>:</p>
-<p><strong>Inputs:</strong> ${context.inputs?.length || 0} connections</p>
-<p><strong>Outputs:</strong> ${context.outputs?.length || 0} connections</p>
-<p>This component is ${context.inputs?.length === 0 ? 'a root source' : context.outputs?.length === 0 ? 'a terminal sink' : 'a middle transformation'} in your data flow.</p>`;
-    }
-
-    /**
-     * Generate validation response
-     * @private
-     */
-    generateValidateResponse() {
-        return `<p>✅ <strong>Validation Passed!</strong></p>
-<p>All entity relationships appear properly configured. Your architecture is ready for deployment.</p>
-<p>Consider running feast apply to validate against actual infrastructure.</p>`;
-    }
-
-    /**
-     * Clear chat history and session
-     */
-    clearSession() {
-        this.currentSession = null;
-        this.messageHistory = [];
-        if (this.messagesContainer) {
-            this.messagesContainer.innerHTML = '';
         }
     }
 }
 
-// Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = LLMHelper;
 }

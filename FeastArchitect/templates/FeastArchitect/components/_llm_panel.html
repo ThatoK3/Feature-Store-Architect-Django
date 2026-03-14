@@ -14,6 +14,13 @@
             <span>AI Assistant</span>
         </div>
         <div class="llm-header-actions">
+            <!-- New chat — only shown when a session is active -->
+            <button class="llm-icon-btn llm-new-chat-btn" id="llmNewChatBtn"
+                onclick="diagram.llmNewChat()" title="New chat" style="display:none">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+            </button>
             <button class="llm-icon-btn" id="llmMinimizeBtn" onclick="diagram.minimizeLLM()" title="Minimize">
                 <svg width="12" height="2" viewBox="0 0 12 2" fill="currentColor"><rect width="12" height="2" rx="1"/></svg>
             </button>
@@ -43,7 +50,7 @@
             </button>
             <button class="llm-prompt-btn" onclick="diagram.askLLM('lineage')">
                 <span class="llm-prompt-icon">🔗</span>
-                <span class="llm-prompt-label">Explain Lineage</span>
+                <span class="llm-prompt-label">Lineage</span>
             </button>
             <button class="llm-prompt-btn" onclick="diagram.askLLM('validate')">
                 <span class="llm-prompt-icon">✅</span>

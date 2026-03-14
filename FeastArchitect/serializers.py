@@ -124,14 +124,15 @@ class LLMMessageSerializer(serializers.ModelSerializer):
 
 
 class LLMChatSessionListSerializer(serializers.ModelSerializer):
-    message_count = serializers.IntegerField(source='get_message_count', read_only=True)
-    repository_name = serializers.CharField(source='repository.name', read_only=True)
-    
+    message_count   = serializers.IntegerField(source='get_message_count', read_only=True)
+    repository_name = serializers.CharField(source='repository.name', read_only=True, allow_null=True)
+    repository_id   = serializers.IntegerField(source='repository.id',  read_only=True, allow_null=True)
+
     class Meta:
         model = LLMChatSession
         fields = [
-            'id', 'title', 'repository_name', 'message_count',
-            'is_active', 'created_at', 'updated_at'
+            'id', 'title', 'repository_id', 'repository_name', 'message_count',
+            'is_active', 'created_at', 'updated_at',
         ]
 
 
@@ -149,17 +150,18 @@ class LLMChatSessionDetailSerializer(serializers.ModelSerializer):
 
 class LLMChatCreateSerializer(serializers.Serializer):
     """For creating new chat sessions."""
-    repository_id = serializers.IntegerField(required=False, allow_null=True)
-    title = serializers.CharField(max_length=255, default="New Chat")
-    initial_message = serializers.CharField(required=False, allow_blank=True)
-    query_type = serializers.CharField(default="default")
+    repository_id    = serializers.IntegerField(required=False, allow_null=True)
+    title            = serializers.CharField(max_length=255, default="New Chat")
+    initial_message  = serializers.CharField(required=False, allow_blank=True)
+    query_type       = serializers.CharField(default="default")
+    selected_node_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
 
 class LLMQuerySerializer(serializers.Serializer):
     """For sending messages to LLM."""
     message = serializers.CharField(required=True)
     query_type = serializers.CharField(default="default")
-    stream = serializers.BooleanField(default=False)
+    selected_node_id = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
 
 class DataSourceSyncSerializer(serializers.Serializer):

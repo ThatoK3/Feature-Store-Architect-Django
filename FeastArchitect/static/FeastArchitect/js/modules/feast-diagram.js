@@ -1566,7 +1566,81 @@ class FeastDiagram {
             this.llmPanelOpen = true;
             this.updateLLMContext();
             this._initLLMPanel(panel);
+            this._llmRestoreSession();
         }
+    }
+
+    async _llmRestoreSession() {
+        // If no active session, check if user has a recent session for this repo
+        if (this.llm.sessionId) return;
+        const container = document.getElementById('llmMessages');
+        if (!container || container.children.length > 0) return;
+        try {
+            const res  = await fetch(`${this.api.baseUrl}/chats/history/`, {
+                headers: { 'X-CSRFToken': this.getCsrfToken() }
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            // Find most recent session for this repo
+            const sessions = data.sessions || data;
+            const repoSession = sessions.find(s =>
+                s.repository_id === this.repoSettings.id && s.message_count > 0
+            );
+            if (!repoSession) return;
+
+            // Show a restore prompt
+            container.innerHTML = `
+                <div class="llm-restore-prompt">
+                    <div class="llm-restore-icon">💬</div>
+                    <div class="llm-restore-text">
+                        You have a previous conversation<br>
+                        <span style="color:var(--text-muted);font-size:11px">${repoSession.title} · ${repoSession.message_count} messages</span>
+                    </div>
+                    <div class="llm-restore-btns">
+                        <button class="llm-restore-btn" onclick="diagram._llmLoadSession(${repoSession.id})">Continue</button>
+                        <button class="llm-restore-btn llm-restore-new" onclick="diagram._llmDismissRestore()">New chat</button>
+                    </div>
+                </div>`;
+        } catch(e) { /* silent */ }
+    }
+
+    async _llmLoadSession(sessionId) {
+        const container = document.getElementById('llmMessages');
+        container.innerHTML = '';
+        try {
+            const res  = await fetch(`${this.api.baseUrl}/chats/${sessionId}/`, {
+                headers: { 'X-CSRFToken': this.getCsrfToken() }
+            });
+            const data = await res.json();
+            this.llm.sessionId = sessionId;
+            this._llmUpdateNewChatBtn();
+            const messages = data.messages || [];
+            messages.forEach(m => {
+                if (m.role === 'user' || m.role === 'assistant') {
+                    this.llm._appendMessage(m.role, m.content, m.role === 'assistant');
+                }
+            });
+            this.llm._scrollBottom();
+        } catch(e) {
+            this.showNotification('Error', 'Could not load previous chat', 'error');
+        }
+    }
+
+    _llmDismissRestore() {
+        document.getElementById('llmMessages').innerHTML = '';
+    }
+
+    llmNewChat() {
+        if (this.llm.sessionId) {
+            if (!confirm('Start a new conversation? Your current chat is saved and can be resumed next time.')) return;
+        }
+        this.llm.clearSession();
+        document.getElementById('llmNewChatBtn').style.display = 'none';
+    }
+
+    _llmUpdateNewChatBtn() {
+        const btn = document.getElementById('llmNewChatBtn');
+        if (btn) btn.style.display = this.llm.sessionId ? '' : 'none';
     }
 
     minimizeLLM() {
@@ -3166,857 +3240,90 @@ class FeastDiagram {
         document.getElementById('codeEditorContent').innerHTML = content;
     }
 
-    async askLLM(promptType) {
-        const messagesContainer = document.getElementById('llmMessages');
-        const context = this.selectedNode ? this.nodes.nodes.get(this.selectedNode) : null;
-        
-        let userMessage = '';
-        
-        switch(promptType) {
-            case 'generate_code':
-                userMessage = 'Generate Feast code for this architecture';
-                break;
-            case 'optimize':
-                userMessage = 'Suggest optimizations for my feature views';
-                break;
-            case 'lineage':
-                userMessage = 'Explain this data lineage';
-                break;
-            case 'validate':
-                userMessage = 'Validate my entity relationships';
-                break;
-        }
-        
-        // Add user message
-        const userMsgDiv = document.createElement('div');
-        userMsgDiv.className = 'llm-message user';
-        userMsgDiv.textContent = userMessage;
-        messagesContainer.appendChild(userMsgDiv);
-        
-        // Show loading
-        const loadingDiv = document.createElement('div');
-        loadingDiv.className = 'llm-message assistant';
-        loadingDiv.innerHTML = '<div class="spinner"></div> Thinking...';
-        messagesContainer.appendChild(loadingDiv);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        
-        // Check if we have a chat session
-        if (!this.currentChatSession) {
-            // Create new session via backend
-            try {
-                const response = await fetch(`${this.api.baseUrl}/chats/`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': this.getCsrfToken()
-                    },
-                    body: JSON.stringify({
-                        repository_id: this.repoSettings.id,
-                        title: `Chat about ${this.repoSettings.name}`,
-                        initial_message: userMessage,
-                        query_type: promptType
-                    })
-                });
-                
-                if (!response.ok) {
-                    throw new Error('Failed to create chat session');
-                }
-                
-                const data = await response.json();
-                this.currentChatSession = data.id;
-                
-                // Remove loading, messages already in response
-                loadingDiv.remove();
-                
-                // Display messages from response
-                if (data.messages) {
-                    data.messages.forEach(msg => {
-                        if (msg.role === 'assistant') {
-                            const assistantMsgDiv = document.createElement('div');
-                            assistantMsgDiv.className = 'llm-message assistant';
-                            assistantMsgDiv.innerHTML = msg.content;
-                            messagesContainer.appendChild(assistantMsgDiv);
-                        }
-                    });
-                }
-                
-                this.addLLMActionButtons(messagesContainer.lastChild);
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                return;
-                
-            } catch (error) {
-                console.error('LLM session creation failed:', error);
-                loadingDiv.innerHTML = 'Error: LLM service unavailable. Using local fallback...';
-                
-                // Fall back to local generation
-                setTimeout(() => {
-                    loadingDiv.remove();
-                    this.fallbackLLMResponse(promptType, context, messagesContainer);
-                }, 1000);
-                return;
-            }
-        }
-        
-        // Existing session - send message
-        try {
-            const response = await fetch(`${this.api.baseUrl}/chats/${this.currentChatSession}/send_message/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': this.getCsrfToken()
-                },
-                body: JSON.stringify({
-                    message: userMessage,
-                    query_type: promptType
-                })
-            });
-            
-            const data = await response.json();
-            
-            loadingDiv.remove();
-            
-            if (data.success) {
-                const assistantMsgDiv = document.createElement('div');
-                assistantMsgDiv.className = 'llm-message assistant';
-                assistantMsgDiv.innerHTML = data.response;
-                messagesContainer.appendChild(assistantMsgDiv);
-                this.addLLMActionButtons(assistantMsgDiv);
-            } else {
-                throw new Error(data.error || 'Unknown error');
-            }
-            
-        } catch (error) {
-            console.error('LLM query failed:', error);
-            loadingDiv.remove();
-            this.fallbackLLMResponse(promptType, context, messagesContainer);
-        }
-        
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    // ── LLM diagram context ──────────────────────────────────────────────────
+    _getLLMDiagramContext() {
+        return {
+            selectedNodeId: this.selectedNode || null,
+            repoId:         this.repoSettings.id,
+        };
     }
 
+        async askLLM(promptType) {
+        await this.llm.askPrompt(promptType, () => this._getLLMDiagramContext());
+    }
+
+    
     sendLLMMessage() {
         const input = document.getElementById('llmInput');
-        const message = input.value.trim();
-        if (!message) return;
-        
-        const messagesContainer = document.getElementById('llmMessages');
-        
-        const userMsgDiv = document.createElement('div');
-        userMsgDiv.className = 'llm-message user';
-        userMsgDiv.textContent = message;
-        messagesContainer.appendChild(userMsgDiv);
-        
-        input.value = '';
-        
-        const loadingDiv = document.createElement('div');
-        loadingDiv.className = 'llm-message assistant';
-        loadingDiv.innerHTML = '<div class="spinner"></div> Analyzing your feature store...';
-        messagesContainer.appendChild(loadingDiv);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        
-        setTimeout(() => {
-            loadingDiv.remove();
-            
-            const assistantMsgDiv = document.createElement('div');
-            assistantMsgDiv.className = 'llm-message assistant';
-            assistantMsgDiv.innerHTML = `
-                <p>I've analyzed your question about "${message}".</p>
-                <p>Based on your current architecture with ${this.nodes.nodes.size} components, I recommend reviewing the data lineage from sources to services to ensure consistency.</p>
-                <p>Would you like me to:</p>
-                <ul style="margin-left: 20px; margin-top: 8px;">
-                    <li>Generate specific code for a component</li>
-                    <li>Analyze feature dependencies</li>
-                    <li>Suggest performance improvements</li>
-                </ul>
-            `;
-            messagesContainer.appendChild(assistantMsgDiv);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }, 2000);
+        const msg   = input?.value?.trim();
+        if (!msg) return;
+        this.llm.sendMessage(msg, () => this._getLLMDiagramContext());
     }
 
+    
     applyLLMSuggestion() {
-        this.showNotification('Applied', 'LLM suggestions applied to diagram');
+        this.showNotification('Info', 'Use the action buttons on individual messages', 'info');
     }
 
     copyLLMResponse(btn) {
-        const message = btn.closest('.llm-message');
-        const text = message.querySelector('p')?.textContent || '';
+        const msg  = btn.closest('.llm-message');
+        const text = msg ? (msg.innerText || '') : '';
         navigator.clipboard.writeText(text);
-        btn.textContent = 'Copied!';
-        setTimeout(() => btn.textContent = 'Copy', 2000);
+        this.showNotification('Copied', 'Response copied to clipboard');
     }
 
     dismissLLM(btn) {
-        btn.closest('.llm-message').remove();
+        btn.closest('.llm-message')?.remove();
     }
 
-    addFeature() {
-        const name = document.getElementById('featureName').value.trim();
-        const type = document.getElementById('featureType').value;
-        
-        if (name) {
-            this.tempFeatures.push({ name, type });
-            document.getElementById('featureName').value = '';
-            this.renderFeaturesList();
+    // Called from ACTION blocks rendered by LLMHelper
+    _llmHighlightNodes(nodeIds) {
+        if (!Array.isArray(nodeIds)) return;
+        const ids = new Set(nodeIds);
+        this._featureHighlightIds = ids;
+        // Also select first node if it exists
+        if (nodeIds.length === 1 && this.nodes.nodes.has(nodeIds[0])) {
+            this.selectNode(nodeIds[0]);
         }
+        this.showNotification('Highlighted', `Highlighted ${ids.size} node${ids.size !== 1 ? 's' : ''} on canvas`);
     }
 
-    removeFeature(idx) {
-        this.tempFeatures.splice(idx, 1);
-        this.renderFeaturesList();
-    }
-
-    addTag() {
-        const input = document.getElementById('tagInput');
-        const tag = input.value.trim().toLowerCase().replace(/\s+/g, '_');
-        
-        if (tag && !this.tempTags.includes(tag)) {
-            this.tempTags.push(tag);
-            input.value = '';
-            this.renderTagsList();
-        }
-    }
-
-    removeTag(idx) {
-        this.tempTags.splice(idx, 1);
-        this.renderTagsList();
-    }
-
-    async requestAccess(nodeId) {
-        const node = this.nodes.nodes.get(nodeId);
-        if (!node) return;
-        
-        // Find the backend data source ID if it exists
-        // This requires storing backend IDs on nodes - add this when loading from backend
-        const backendId = node.backendId;
-        
-        if (!backendId) {
-            // Local-only node, just show notification
-            this.showNotification('Access Requested', `Request sent to ${node.ownedBy} for ${node.name}`);
-            setTimeout(() => {
-                this.showNotification('Request Approved', `You now have read access to ${node.name}`);
-            }, 2000);
+    _llmSelectNode(nodeId) {
+        if (!nodeId || !this.nodes.nodes.has(nodeId)) {
+            this.showNotification('Not found', `Node "${nodeId}" not found`, 'warning');
             return;
         }
-        
-        try {
-            // Create audit log entry for access request
-            const response = await fetch(`${this.api.baseUrl}/audit-logs/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': this.getCsrfToken()
-                },
-                body: JSON.stringify({
-                    action: 'ACCESS_REQUEST',
-                    resource_type: 'datasource',
-                    resource_name: node.name,
-                    details: {
-                        data_source_id: backendId,
-                        owner: node.ownedBy
-                    }
-                })
-            });
-            
-            if (response.ok) {
-                this.showNotification('Access Requested', `Request logged for ${node.name}`);
-            } else {
-                throw new Error('Failed to log request');
-            }
-            
-        } catch (error) {
-            console.error('Access request failed:', error);
-            this.showNotification('Error', 'Failed to submit access request');
-        }
+        this.selectNode(nodeId);
+        this.centerOnNode(nodeId);
     }
 
-    showAddMenu() {
-        const menu = document.querySelector('.fab-menu');
-        const buttons = ['fabSource', 'fabEntity', 'fabView', 'fabService'];
-        const isVisible = document.getElementById('fabSource').style.display !== 'none';
-        
-        buttons.forEach((id, idx) => {
-            setTimeout(() => {
-                document.getElementById(id).style.display = isVisible ? 'none' : 'flex';
-            }, idx * 50);
-        });
-    }
-
-    copyCode(btn) {
-        const code = btn.closest('.code-block').querySelector('.code-content').innerText;
-        navigator.clipboard.writeText(code);
-        btn.textContent = 'Copied!';
-        setTimeout(() => btn.textContent = 'Copy', 2000);
-    }
-
-    updateDBTypeInfo() {
-        const kind = document.getElementById('inputKind').value;
-        const dbType = this.nodes.databaseTypes[kind];
-        if (dbType) {
-            document.getElementById('dbTypeHint').textContent = `Default process: ${dbType.defaultProcess}`;
-        }
-    }
-
-    renderEdgeManager() {
-        const edgeList = document.getElementById('edgeList');
-        const fromSelect = document.getElementById('edgeFromSelect');
-        const toSelect = document.getElementById('edgeToSelect');
-        
-        // Guard: DOM elements may not exist yet
-        if (!edgeList || !fromSelect || !toSelect) {
-            console.warn('renderEdgeManager: panel DOM not ready');
+    async _llmApplyEdit(edit, btn) {
+        if (!edit?.node_id || !edit?.field) return;
+        const node = this.nodes.nodes.get(edit.node_id);
+        if (!node) {
+            this.showNotification('Not found', `Node "${edit.node_id}" not found`, 'error');
             return;
         }
-        
-        const totalEdges = this.nodes.edges.length;
-        const validEdges = this.nodes.edges.filter(e => this.nodes.nodes.has(e.from) && this.nodes.nodes.has(e.to)).length;
-        const orphanedEdges = totalEdges - validEdges;
-        
-        document.getElementById('edgeCountTotal').textContent = totalEdges;
-        document.getElementById('edgeCountValid').textContent = validEdges;
-        document.getElementById('edgeCountOrphaned').textContent = orphanedEdges;
-        
-        if (this.nodes.edges.length === 0) {
-            edgeList.innerHTML = `
-                <div class="empty-state" style="padding: 40px 20px;">
-                    <div class="empty-icon">🔗</div>
-                    <div class="empty-title">No Connections</div>
-                    <p style="font-size: 13px;">Create connections between nodes to establish lineage</p>
-                </div>
-            `;
+        // Apply the change
+        if (edit.field.includes('.')) {
+            const [parent, child] = edit.field.split('.');
+            if (!node[parent]) node[parent] = {};
+            node[parent][child] = edit.value;
         } else {
-            edgeList.innerHTML = this.nodes.edges.map(edge => {
-                const fromNode = this.nodes.nodes.get(edge.from);
-                const toNode = this.nodes.nodes.get(edge.to);
-                const isValid = fromNode && toNode;
-                
-                if (!isValid) {
-                    return `
-                        <div class="edge-item" style="border-color: var(--feast-red); opacity: 0.7;">
-                            <div class="edge-header">
-                                <div style="color: var(--feast-red); font-size: 20px;">⚠️</div>
-                                <div style="flex: 1;">
-                                    <div style="font-weight: 500; color: var(--feast-red);">Orphaned Connection</div>
-                                    <div style="font-size: 12px; color: var(--text-muted);">
-                                        ${!fromNode ? `Missing source: ${edge.from}` : ''}
-                                        ${!fromNode && !toNode ? ' | ' : ''}
-                                        ${!toNode ? `Missing target: ${edge.to}` : ''}
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="edge-actions">
-                                <button class="edge-btn danger" onclick="diagram.deleteEdge('${edge.id}')">Delete</button>
-                            </div>
-                        </div>
-                    `;
-                }
-                
-                const fromConfig = this.config.colors[fromNode.type];
-                const toConfig = this.config.colors[toNode.type];
-                
-                let fromIcon = fromConfig.icon;
-                if (fromNode.type === 'datasource' && fromNode.dbType && fromNode.dbType.icon) {
-                    fromIcon = fromNode.dbType.icon;
-                }
-                
-                let toIcon = toConfig.icon;
-                if (toNode.type === 'datasource' && toNode.dbType && toNode.dbType.icon) {
-                    toIcon = toNode.dbType.icon;
-                }
-                
-                return `
-                    <div class="edge-item">
-                        <div class="edge-header">
-                            <div class="edge-node-icon" style="background: ${fromConfig.bg}20; color: ${fromConfig.light};">
-                                ${fromIcon}
-                            </div>
-                            <div style="flex: 1;">
-                                <div style="font-weight: 500;">${fromNode.name}</div>
-                                <div style="font-size: 11px; color: var(--text-muted);">${fromConfig.label}</div>
-                            </div>
-                            <span class="edge-arrow">→</span>
-                            <div class="edge-node-icon" style="background: ${toConfig.bg}20; color: ${toConfig.light};">
-                                ${toIcon}
-                            </div>
-                            <div style="flex: 1;">
-                                <div style="font-weight: 500;">${toNode.name}</div>
-                                <div style="font-size: 11px; color: var(--text-muted);">${toConfig.label}</div>
-                            </div>
-                        </div>
-                        <div class="edge-actions">
-                            <button class="edge-btn" onclick="diagram.selectNode('${edge.from}')">View Source</button>
-                            <button class="edge-btn" onclick="diagram.selectNode('${edge.to}')">View Target</button>
-                            <button class="edge-btn danger" onclick="diagram.deleteEdge('${edge.id}')">Disconnect</button>
-                        </div>
-                    </div>
-                `;
-            }).join('');
+            node[edit.field] = edit.value;
         }
-        
-        const nodeOptions = Array.from(this.nodes.nodes.values()).map(node => {
-            const config = this.config.colors[node.type];
-            let icon = config.icon;
-            if (node.type === 'datasource' && node.dbType && node.dbType.icon) {
-                icon = node.dbType.icon;
-            }
-            return `<option value="${node.id}">${icon} ${node.name}</option>`;
-        }).join('');
-        
-        fromSelect.innerHTML = '<option value="">Select source...</option>' + nodeOptions;
-        toSelect.innerHTML = '<option value="">Select target...</option>' + nodeOptions;
-    }
-
-    deleteEdge(edgeId) {
-        if (!confirm('Are you sure you want to delete this connection?')) return;
-        
-        const edgeIndex = this.nodes.edges.findIndex(e => e.id === edgeId);
-        if (edgeIndex === -1) return;
-        
-        const edge = this.nodes.edges[edgeIndex];
-        
-        this.nodes.edges.splice(edgeIndex, 1);
-        
-        const fromNode = this.nodes.nodes.get(edge.from);
-        const toNode = this.nodes.nodes.get(edge.to);
-        
-        if (fromNode) {
-            fromNode.outputs = fromNode.outputs.filter(id => id !== edge.to);
-        }
-        if (toNode) {
-            toNode.inputs = toNode.inputs.filter(id => id !== edge.from);
-        }
-        
-        if (toNode && toNode.type === 'featureview') {
-            toNode.entities = toNode.entities.filter(id => id !== edge.from);
-        }
-        if (toNode && toNode.type === 'service') {
-            toNode.features = toNode.features.filter(id => id !== edge.from);
-            if (toNode.featureServices) {
-                toNode.featureServices = toNode.featureServices.filter(id => id !== edge.from);
-            }
-        }
-        
-        this.renderEdgeManager();
-        this.showNotification('Disconnected', 'Connection removed');
-        
-        if (this.selectedNode) {
-            this.showPanel(this.selectedNode);
-        }
-    }
-
-    async updateDjangoPanel() {
-        // Fetch current user from backend
-        try {
-            const userResponse = await fetch(`${this.api.baseUrl}/auth/user/`);
-            if (userResponse.ok) {
-                const userData = await userResponse.json();
-                this.currentUser = {
-                    id: userData.id,
-                    name: `${userData.first_name} ${userData.last_name}`.trim() || userData.username,
-                    initials: (userData.first_name?.[0] || userData.username[0]).toUpperCase(),
-                    role: 'Authenticated User',
-                    team: 'Django User'
-                };
-            }
-        } catch (e) {
-            // Use existing mock user
-        }
-        
-        document.getElementById('djangoCurrentUser').textContent = this.currentUser.name;
-        document.getElementById('djangoTeam').textContent = this.currentUser.team;
-        document.getElementById('djangoRole').textContent = this.currentUser.role;
-        
-        // Fetch real audit logs
-        try {
-            const auditResponse = await fetch(`${this.api.baseUrl}/audit-logs/?limit=10`);
-            if (auditResponse.ok) {
-                const auditData = await auditResponse.json();
-                const auditContainer = document.getElementById('djangoAuditLog');
-                
-                if (auditData.results && auditData.results.length > 0) {
-                    auditContainer.innerHTML = auditData.results.map(event => {
-                        const time = new Date(event.timestamp).toLocaleTimeString();
-                        return `
-                            <div class="audit-log-item">
-                                <div class="audit-time">${time}</div>
-                                <div>
-                                    <span class="audit-action">${event.action}</span>
-                                    <span style="color: var(--text-muted);"> • </span>
-                                    <span>${event.resource_name}</span>
-                                </div>
-                                <div class="audit-user">${event.user_username || 'System'}</div>
-                            </div>
-                        `;
-                    }).join('');
-                }
-            }
-        } catch (e) {
-            // Fallback to mock data
-            const auditContainer = document.getElementById('djangoAuditLog');
-            const auditEvents = [
-                { time: '2 min ago', action: 'Viewed', resource: 'User Database', user: this.currentUser.name },
-                { time: '15 min ago', action: 'Modified', resource: 'Transaction History', user: this.currentUser.name }
-            ];
-            auditContainer.innerHTML = auditEvents.map(event => `
-                <div class="audit-log-item">
-                    <div class="audit-time">${event.time}</div>
-                    <div>
-                        <span class="audit-action">${event.action}</span>
-                        <span style="color: var(--text-muted);"> • </span>
-                        <span>${event.resource}</span>
-                    </div>
-                    <div class="audit-user">${event.user}</div>
-                </div>
-            `).join('');
-        }
-        
-        // Update permissions based on actual data sources
-        const permsContainer = document.getElementById('djangoPermissions');
-        const datasources = Array.from(this.nodes.nodes.values()).filter(n => n.type === 'datasource');
-        
-        permsContainer.innerHTML = datasources.map(ds => {
-            const perm = this.calculatePermission(ds);
-            const permClass = {
-                'owned': 'perm-owned',
-                'granted': 'perm-granted',
-                'pending': 'perm-pending',
-                'denied': 'perm-denied'
-            }[perm];
-            
-            return `
-                <div class="detail-row">
-                    <span class="detail-label">${ds.name}</span>
-                    <span class="permission-badge ${permClass}">
-                        ${perm === 'owned' ? '👑 Owned' : 
-                          perm === 'granted' ? '✅ Granted' : 
-                          perm === 'pending' ? '⏳ Pending' : '❌ Denied'}
-                    </span>
-                </div>
-            `;
-        }).join('') || '<p style="color: var(--text-muted);">No data sources</p>';
-        
-        // Column security - use actual node data
-        const colContainer = document.getElementById('djangoColumnSecurity');
-        if (this.selectedNode && this.nodes.nodes.get(this.selectedNode)?.type === 'datasource') {
-            const node = this.nodes.nodes.get(this.selectedNode);
-            const columns = node.columnSecurity || { piiColumns: [], maskedColumns: [], restrictedColumns: [] };
-            
-            colContainer.innerHTML = `
-                <div class="column-security-grid">
-                    ${['user_id', 'email', 'name', 'phone', 'ssn', 'created_at', 'updated_at'].map(col => {
-                        const isPii = columns.piiColumns.includes(col);
-                        const isMasked = columns.maskedColumns.includes(col);
-                        const isRestricted = columns.restrictedColumns.includes(col);
-                        
-                        let status = 'accessible';
-                        let statusClass = 'status-accessible';
-                        
-                        if (isRestricted) {
-                            status = 'denied';
-                            statusClass = 'status-denied';
-                        } else if (isMasked) {
-                            status = 'masked';
-                            statusClass = 'status-masked';
-                        }
-                        
-                        return `
-                            <div class="column-item">
-                                <span>${col} ${isPii ? '🔒' : ''}</span>
-                                <span class="column-status ${statusClass}" title="${status}"></span>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            `;
-        } else {
-            colContainer.innerHTML = '<p style="color: var(--text-muted); font-size: 13px;">Select a data source to view column security</p>';
-        }
-    }
-
-    renderFeaturesList() {
-        const container = document.getElementById('featuresList');
-        if (!container) return;
-        
-        container.innerHTML = this.tempFeatures.map((f, idx) => `
-            <div class="feature-tag-builder">
-                <div class="feature-tag-info">
-                    <span class="feature-tag-name">${f.name}</span>
-                    <span class="feature-tag-type">${f.type}</span>
-                </div>
-                <button class="feature-tag-remove" onclick="diagram.removeFeature(${idx})">×</button>
-            </div>
-        `).join('');
-    }
-
-    renderTagsList() {
-        const container = document.getElementById('tagsList');
-        if (!container) return;
-        
-        container.innerHTML = this.tempTags.map((tag, idx) => `
-            <div class="feature-tag-builder">
-                <div class="feature-tag-info">
-                    <span class="feature-tag-name">#${tag}</span>
-                </div>
-                <button class="feature-tag-remove" onclick="diagram.removeTag(${idx})">×</button>
-            </div>
-        `).join('');
-    }
-
-    async forcePushRepo(payload) {
-        document.getElementById('pushStatus').innerHTML = 'Force updating...';
-        
-        try {
-            const response = await fetch(`${this.api.baseUrl}/repositories/${this.repoSettings.id}/force_update/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': this.getCsrfToken()
-                },
-                body: JSON.stringify(payload)
-            });
-            
-            const data = await response.json();
-            
-            if (response.ok) {
-                document.getElementById('pushProgress').style.width = '100%';
-                document.getElementById('pushProgress').style.backgroundColor = 'var(--feast-green)';
-                document.getElementById('pushStatus').innerHTML = 
-                    '✅ Force update successful!';
-                this.showNotification('Force Updated', 'Repository overwritten');
-            } else {
-                throw new Error(data.detail || 'Force update failed');
-            }
-        } catch (error) {
-            document.getElementById('pushStatus').innerHTML = 
-                `❌ Force update failed: ${error.message}`;
-            document.getElementById('pushProgress').style.backgroundColor = 'var(--feast-red)';
-        }
-    }
-
-    showUserSelector() {
-        document.getElementById('userSelectorModal').classList.add('active');
-    }
-
-    updateLLMContext() {
-        const container = document.getElementById('llmContextContent');
-        const iconEl = container ? container.querySelector('.llm-context-icon') : null;
-        const textEl = container ? container.querySelector('.llm-context-text') : null;
-        if (!iconEl || !textEl) {
-            // Fallback if old DOM
-            if (!container) return;
-        }
-        const setText = (icon, text) => {
-            if (iconEl) { iconEl.textContent = icon; textEl.textContent = text; }
-        };
-        
-        if (!this.selectedNode) {
-            const stats = {
-                nodes: this.nodes.nodes.size,
-                edges: this.nodes.edges.length,
-                sources: Array.from(this.nodes.nodes.values()).filter(n => n.type === 'datasource').length,
-                entities: Array.from(this.nodes.nodes.values()).filter(n => n.type === 'entity').length,
-                views: Array.from(this.nodes.nodes.values()).filter(n => n.type === 'featureview').length,
-                services: Array.from(this.nodes.nodes.values()).filter(n => n.type === 'service').length
-            };
-            
-            setText('📊', `${stats.nodes} components · ${stats.views} views · ${stats.services} services`);
-        } else {
-            const node = this.nodes.nodes.get(this.selectedNode);
-            const config = this.config.colors[node.type];
-            
-            let icon = config.icon;
-            if (node.type === 'datasource' && node.dbType && node.dbType.icon) {
-                icon = node.dbType.icon;
-            }
-            
-            const extras = [];
-            if (node.features && node.type === 'featureview') extras.push(`${node.features.length} features`);
-            if (node.entities) extras.push(`${node.entities.length} entities`);
-            setText(icon, `${node.name} · ${config.label}${extras.length ? ' · ' + extras.join(' · ') : ''}`);
-        }
-    }
-
-    updateLayerToggles() {
-        const toggles = {
-            datasource: 'toggleSources',
-            entity: 'toggleEntities',
-            featureview: 'toggleViews',
-            service: 'toggleServices'
-        };
-        
-        Object.entries(toggles).forEach(([type, id]) => {
-            const btn = document.getElementById(id);
-            if (this.visibleLayers[type]) {
-                btn.classList.remove('hidden-layer');
-                btn.querySelector('.eye-icon').textContent = '👁';
-            } else {
-                btn.classList.add('hidden-layer');
-                btn.querySelector('.eye-icon').textContent = '🚫';
-            }
-        });
-    }
-
-    fallbackLLMResponse(promptType, context, container) {
-        // Your existing mock response logic as fallback
-        let assistantResponse = '';
-        
-        switch(promptType) {
-            case 'generate_code':
-                assistantResponse = this.generateLLMCodeResponse(context);
-                break;
-            case 'optimize':
-                assistantResponse = this.generateLLMOptimizeResponse(context);
-                break;
-            case 'lineage':
-                assistantResponse = this.generateLLMLineageResponse(context);
-                break;
-            case 'validate':
-                assistantResponse = this.generateLLMValidateResponse();
-                break;
-        }
-        
-        const assistantMsgDiv = document.createElement('div');
-        assistantMsgDiv.className = 'llm-message assistant';
-        assistantMsgDiv.innerHTML = assistantResponse + '<p style="color: var(--text-muted); font-size: 11px; margin-top: 8px;">[Local fallback - backend unavailable]</p>';
-        container.appendChild(assistantMsgDiv);
-        this.addLLMActionButtons(assistantMsgDiv);
-    }
-
-    updateRepoSubtitle() {
-        document.getElementById('repoSubtitle').textContent = `${this.repoSettings.name} • ${this.repoSettings.location}`;
-    }
-
-    updateStats() {
-        const stats = {
-            datasource: 0,
-            entity: 0,
-            featureview: 0,
-            service: 0,
-            features: 0
-        };
-        
-        this.nodes.nodes.forEach(node => {
-            if (stats[node.type] !== undefined) {
-                stats[node.type]++;
-            }
-            if (node.type === 'featureview' && node.features && Array.isArray(node.features)) {
-                stats.features += node.features.length;
-            }
-        });
-        
-        document.getElementById('statSources').textContent = stats.datasource;
-        document.getElementById('statEntities').textContent = stats.entity;
-        document.getElementById('statViews').textContent = stats.featureview;
-        document.getElementById('statServices').textContent = stats.service;
-        document.getElementById('statFeatures').textContent = stats.features;
-    }
-
-    showTooltip(nodeId, x, y) {
-        const node = this.nodes.nodes.get(nodeId);
-        const tooltip = document.getElementById('tooltip');
-        
-        let icon = this.config.colors[node.type].icon;
-        if (node.type === 'datasource' && node.dbType && node.dbType.icon) {
-            icon = node.dbType.icon;
-        }
-        
-        document.getElementById('tooltipIcon').textContent = icon;
-        document.getElementById('tooltipTitle').textContent = node.name;
-        
-        let subtitle = `${this.config.colors[node.type].label}`;
-        if (node.subtype) subtitle += ` • ${node.subtype}`;
-        if (node.kind) {
-            const dbName = node.dbType ? node.dbType.name : node.kind;
-            subtitle += ` • ${dbName}`;
-        }
-        document.getElementById('tooltipSubtitle').textContent = subtitle;
-        
-        const tagsDiv = document.getElementById('tooltipTags');
-        const tagList = document.getElementById('tooltipTagList');
-        if (node.tags && node.tags.length > 0) {
-            tagsDiv.style.display = 'block';
-            tagList.innerHTML = node.tags.map(tag => 
-                `<span class="tooltip-tag">#${tag}</span>`
-            ).join('');
-        } else {
-            tagsDiv.style.display = 'none';
-        }
-        
-        const featuresDiv = document.getElementById('tooltipFeatures');
-        const featureList = document.getElementById('tooltipFeatureList');
-        
-        if (node.type === 'featureview' && node.features && node.features.length > 0) {
-            featuresDiv.style.display = 'block';
-            // Update title with count
-            const titleEl = document.getElementById('tooltipFeaturesTitle');
-            if (titleEl) titleEl.textContent = `Features (${node.features.length})`;
-            featureList.innerHTML = node.features.slice(0, 4).map(f => {
-                const name = typeof f === 'string' ? f : f.name;
-                const type = typeof f === 'string' ? '' : (f.type || '');
-                return `<span class="tooltip-feature-tag" title="${type}">${name}</span>`;
-            }).join('');
-            if (node.features.length > 4) {
-                featureList.innerHTML += `<span style="color: var(--text-muted); font-size: 11px;">+${node.features.length - 4} more</span>`;
-            }
-            // Rich metadata summary
-            const metaEl = document.getElementById('tooltipFeatureMeta');
-            if (metaEl) {
-                const piiCount = node.features.filter(f => f.security && f.security.pii).length;
-                const onlineCount = node.features.filter(f => f.serving && f.serving.online).length;
-                const types = [...new Set(node.features.map(f => f.type).filter(Boolean))];
-                let meta = '';
-                if (piiCount > 0) meta += `<span style="font-size:10px;padding:2px 6px;background:rgba(239,68,68,0.15);color:#f87171;border-radius:4px">🔒 ${piiCount} PII</span>`;
-                if (onlineCount > 0) meta += `<span style="font-size:10px;padding:2px 6px;background:rgba(16,185,129,0.12);color:#34d399;border-radius:4px">⚡ ${onlineCount} online</span>`;
-                if (types.length > 0) meta += `<span style="font-size:10px;padding:2px 6px;background:var(--bg-tertiary);color:var(--text-muted);border-radius:4px">${types.slice(0,3).join(', ')}${types.length>3?'…':''}</span>`;
-                metaEl.innerHTML = meta;
-            }
-        } else {
-            featuresDiv.style.display = 'none';
-        }
-        
-        const descDiv = document.getElementById('tooltipDescription');
-        const descText = document.getElementById('tooltipDescText');
-        if (node.description) {
-            descDiv.style.display = 'block';
-            descText.textContent = node.description;
-        } else {
-            descDiv.style.display = 'none';
-        }
-        
-        tooltip.style.display = 'block';
-        tooltip.style.left = `${Math.min(x + 20, window.innerWidth - 340)}px`;
-        tooltip.style.top = `${Math.min(y + 20, window.innerHeight - 200)}px`;
-    }
-
-    updateTooltip(x, y) {
-        const tooltip = document.getElementById('tooltip');
-        tooltip.style.left = `${Math.min(x + 20, window.innerWidth - 340)}px`;
-        tooltip.style.top = `${Math.min(y + 20, window.innerHeight - 200)}px`;
-    }
-
-    hideTooltip() {
-        document.getElementById('tooltip').style.display = 'none';
-    }
-
-    showNotification(title, text, type = 'success', duration = 3000) {
-        this.ui.showNotification(title, text, type, duration);
-    }
-
-    loadPattern(patternName) {
-        // Legacy stub — guide replaced with ticket modal
+        // Refresh panel if this node is selected
+        if (this.selectedNode === edit.node_id) this.showPanel(edit.node_id);
+        btn.closest('.llm-action-bar').innerHTML =
+            '<span style="color:var(--feast-green);font-size:12px">✓ Applied</span>';
+        this.showNotification('Applied', `Updated ${edit.field} on "${node.name}"`);
     }
 
     addLLMActionButtons(messageDiv) {
-        const actionsDiv = document.createElement('div');
-        actionsDiv.className = 'llm-actions';
-        actionsDiv.innerHTML = `
-            <button class="llm-action-btn" onclick="diagram.applyLLMSuggestion()">Apply to Diagram</button>
-            <button class="llm-action-btn" onclick="diagram.copyLLMResponse(this)">Copy</button>
-            <button class="llm-action-btn" onclick="diagram.dismissLLM(this)">Dismiss</button>
-        `;
-        messageDiv.appendChild(actionsDiv);
+        // Legacy — no-op, action bars now injected by LLMHelper
     }
 
+    
     renderSearchResults(grouped, query) {
         let html = '';
         

@@ -27,7 +27,7 @@ from .serializers import (
     LLMChatSessionDetailSerializer, LLMChatCreateSerializer,
     LLMQuerySerializer, DataSourceSyncSerializer, LLMMessageSerializer
 )
-from .llm_client import GroqLLMClient, LLMContext
+from .llm_client import GroqLLMClient, build_context_from_json
 
 logger = logging.getLogger(__name__)
 
@@ -605,7 +605,10 @@ class LLMChatSessionViewSet(viewsets.ModelViewSet):
         initial_msg = validated.get('initial_message', '')
         if initial_msg:
             try:
-                self._send_to_llm(session, initial_msg, validated.get('query_type', 'default'))
+                self._send_to_llm(
+                    session, initial_msg, validated.get('query_type', 'default'),
+                    selected_node_id=validated.get('selected_node_id'),
+                )
             except Exception as e:
                 logger.error(f"LLM initial message failed: {str(e)}")
                 # Don't fail session creation, just log the error
@@ -618,38 +621,42 @@ class LLMChatSessionViewSet(viewsets.ModelViewSet):
         
         return session
     
-    def _send_to_llm(self, session, message, query_type):
+    def _send_to_llm(self, session, message, query_type, selected_node_id=None):
         """
-        Send message to Groq and save response.
-        Returns the result dict for API responses.
+        Send message to Groq with full conversation history and rich architecture context.
         """
-        # Save user message
-        user_msg = LLMMessage.objects.create(
+        # Save user message first
+        LLMMessage.objects.create(
             session=session,
             role='user',
             content=message,
             query_type=query_type
         )
-        
-        # Build context
-        context = LLMContext(
-            repo_name=session.context_json.get('repo_name', 'Unknown'),
-            node_count=session.context_json.get('node_count', 0),
-            edge_count=session.context_json.get('edge_count', 0)
+
+        # Build conversation history (all prior messages, excluding the one we just saved)
+        history = list(
+            session.messages
+            .filter(role__in=['user', 'assistant'])
+            .order_by('created_at')
+            .values('role', 'content')
         )
-        
-        # Call LLM
+        # Drop the last entry — it's the message we just inserted
+        if history and history[-1]['role'] == 'user':
+            history = history[:-1]
+
+        # Call LLM with rich context
         try:
             client = GroqLLMClient()
             result = client.query(
                 message=message,
-                context=context,
+                history=history,
+                repo=session.repository,
+                selected_node_id=selected_node_id,
                 query_type=query_type,
-                stream=False
             )
-            
+
             # Save assistant response
-            assistant_msg = LLMMessage.objects.create(
+            LLMMessage.objects.create(
                 session=session,
                 role='assistant',
                 content=result['response'],
@@ -657,20 +664,14 @@ class LLMChatSessionViewSet(viewsets.ModelViewSet):
                 prompt_tokens=result['usage']['prompt_tokens'],
                 completion_tokens=result['usage']['completion_tokens'],
                 total_tokens=result['usage']['total_tokens'],
-                model=result['model']
+                model=result['model'],
             )
-            
-            # Update session timestamp
+
             session.save(update_fields=['updated_at'])
-            
-            logger.info(f"LLM response saved: session={session.id}, tokens={result['usage']['total_tokens']}")
-            
             return result
-            
+
         except Exception as e:
             logger.error(f"LLM query failed: {str(e)}")
-            
-            # Save error as system message
             LLMMessage.objects.create(
                 session=session,
                 role='system',
@@ -678,7 +679,8 @@ class LLMChatSessionViewSet(viewsets.ModelViewSet):
                 query_type='error'
             )
             raise
-    
+
+
     @action(detail=True, methods=['post'])
     def send_message(self, request, pk=None):
         """
@@ -693,7 +695,8 @@ class LLMChatSessionViewSet(viewsets.ModelViewSet):
             result = self._send_to_llm(
                 session,
                 serializer.validated_data['message'],
-                serializer.validated_data.get('query_type', 'default')
+                serializer.validated_data.get('query_type', 'default'),
+                selected_node_id=serializer.validated_data.get('selected_node_id'),
             )
             
             # Return just the response data (not full session)
