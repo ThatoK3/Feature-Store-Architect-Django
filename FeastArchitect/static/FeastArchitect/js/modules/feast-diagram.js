@@ -2881,7 +2881,7 @@ class FeastDiagram {
         modal.classList.add('active');
     }
 
-    showGuide() {
+    showTicketModal() {
         // Reset form
         ['ticketError','ticketSuccess'].forEach(id => {
             const el = document.getElementById(id);
