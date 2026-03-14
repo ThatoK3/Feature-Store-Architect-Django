@@ -27,7 +27,7 @@ from .serializers import (
     LLMChatSessionDetailSerializer, LLMChatCreateSerializer,
     LLMQuerySerializer, DataSourceSyncSerializer, LLMMessageSerializer
 )
-from .llm_client import GroqLLMClient, build_context_from_json
+from .llm_client import GroqLLMClient
 
 logger = logging.getLogger(__name__)
 
