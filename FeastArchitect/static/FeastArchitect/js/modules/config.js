@@ -361,7 +361,7 @@ const NODE_CONFIG = {
  * @type {Object}
  */
 const DIMENSIONS = {
-    nodeWidth: 200,
+    nodeWidth: 288,
     nodeHeight: 100,
     portRadius: 6
 };
