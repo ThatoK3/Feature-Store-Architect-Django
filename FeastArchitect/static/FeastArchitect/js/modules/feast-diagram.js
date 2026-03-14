@@ -1582,7 +1582,7 @@ class FeastDiagram {
             if (!res.ok) return;
             const data = await res.json();
             // Find most recent session for this repo
-            const sessions = data.sessions || data;
+            const sessions = data.sessions || [];
             const repoSession = sessions.find(s =>
                 s.repository_id === this.repoSettings.id && s.message_count > 0
             );

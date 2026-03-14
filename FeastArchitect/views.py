@@ -731,10 +731,10 @@ class LLMChatSessionViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def history(self, request):
-        """Get chat history for current user."""
-        sessions = self.get_queryset()[:50]
+        """Get chat history for current user, scoped to their sessions only."""
+        sessions = self.get_queryset()[:50]  # get_queryset already filters user=request.user
         serializer = LLMChatSessionListSerializer(sessions, many=True)
-        return Response(serializer.data)
+        return Response({'sessions': serializer.data})
 
 
 
