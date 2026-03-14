@@ -2100,7 +2100,7 @@ class FeastDiagram {
 
         html += `<div class="panel-section"><div class="section-header"><div class="section-title">Python API</div></div>
             <div class="code-block"><div class="code-header"><span class="code-lang">Python</span><button class="code-copy" onclick="diagram.copyCode(this)">Copy</button></div>
-            <div class="code-content">${this.generateCodeExample(node)}</div></div></div>`;
+            <pre class="code-content">${this.generateCodeExample(node)}</pre></div></div>`;
 
         return html;
     }
@@ -4339,7 +4339,19 @@ class FeastDiagram {
         console.log('Pattern library moved to Data Engineer guide context');
     }
 
-    generateCodeExample(node) {
+    _dedent(str) {
+        // Strip common leading whitespace from multi-line template literals
+        const lines = str.split('\n');
+        const nonEmpty = lines.filter(l => l.trim().length > 0);
+        if (!nonEmpty.length) return str;
+        const indent = nonEmpty.reduce((min, l) => {
+            const m = l.match(/^(\s*)/);
+            return Math.min(min, m ? m[1].length : 0);
+        }, Infinity);
+        return lines.map(l => l.slice(indent)).join('\n').replace(/^\n+/, '').replace(/\n+$/, '');
+    }
+
+        generateCodeExample(node) {
         if (node.type === 'featureview') {
             return `<span class="code-comment"># Retrieve features from ${node.name}</span>
     <span class="code-keyword">from</span> feast <span class="code-keyword">import</span> FeatureStore
@@ -4353,7 +4365,7 @@ ${node.features.slice(0, 2).map(f => `<span class="code-string">"${node.name}:${
         entity_rows=[{<span class="code-string">"${this.nodes.nodes.get(node.entities[0])?.joinKey || 'id'}"</span>: <span class="code-string">"123"</span>}]
     ).to_df()`;
         } else if (node.type === 'service') {
-            return `<span class="code-comment"># Use feature service</span>
+            return this._dedent(`<span class="code-comment"># Use feature service</span>
     <span class="code-keyword">from</span> feast <span class="code-keyword">import</span> FeatureStore
     
     store = FeatureStore(repo_path=<span class="code-string">"${this.repoSettings.location}"</span>)
@@ -4361,18 +4373,18 @@ ${node.features.slice(0, 2).map(f => `<span class="code-string">"${node.name}:${
     features = store.get_online_features(
         feature_service=<span class="code-string">"${node.name}"</span>,
         entity_rows=[{<span class="code-string">"user_id"</span>: <span class="code-string">"123"</span>}]
-    ).to_df()`;
+    ).to_df()`);
         } else if (node.type === 'entity') {
-            return `<span class="code-comment"># Define entity</span>
+            return this._dedent(`<span class="code-comment"># Define entity</span>
     <span class="code-keyword">from</span> feast <span class="code-keyword">import</span> Entity, ValueType
     
     <span class="code-keyword">${node.name.toLowerCase().replace(/\s+/g, '_')}</span> = Entity(
         name=<span class="code-string">"${node.name}"</span>,
         join_keys=[<span class="code-string">"${node.joinKey}"</span>],
         value_type=ValueType.STRING
-    )`;
+    )`);
         }
-        return `<span class="code-comment"># Component code example</span>`;
+        return this._dedent(`<span class="code-comment"># Component code example</span>`);
     }
 
     applyUserContext() {

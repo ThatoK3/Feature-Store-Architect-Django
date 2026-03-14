@@ -1063,6 +1063,11 @@
         .code-content {
             color: #e2e8f0;
             line-height: 1.6;
+            white-space: pre;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            display: block;
         }
 
         [data-theme="light"] .code-content {
