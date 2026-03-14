@@ -1,7 +1,7 @@
 {% extends "FeastArchitect/base.html" %}
 {% load static %}
 
-{% block title %}Feature Store Architect{% if repo_name %} - {{ repo_name }}{% endif %}{% endblock %}
+{% block title %}Feast Feature Store Architect{% if repo_name %} - {{ repo_name }}{% endif %}{% endblock %}
 
 {% block content %}
     {% include "FeastArchitect/components/_toolbar.html" %}
@@ -20,7 +20,6 @@
 {% block modals %}
     {% include "FeastArchitect/components/_modals.html" %}
     {% include "FeastArchitect/components/_tooltip.html" %}
-    {% include "FeastArchitect/components/guide/_guide_modal.html" %}
 {% endblock %}
 
 {% block extra_js %}

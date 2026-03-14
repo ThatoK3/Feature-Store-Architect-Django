@@ -774,6 +774,10 @@ class FeastDiagram {
         document.addEventListener('keydown', (e) => {
             // Escape closes panels/modals
             if (e.key === 'Escape') {
+                if (document.getElementById('ticketModal')?.classList.contains('active')) {
+                    this.closeTicketModal();
+                    return;
+                }
                 this.ui.closeAllPanels();
                 this.ui.closeAllModals();
             }
@@ -2878,68 +2882,56 @@ class FeastDiagram {
     }
 
     showGuide() {
-        document.getElementById('guideModal').classList.add('active');
-        
-        // Initialize mermaid diagrams if library is loaded
-        if (window.mermaid) {
-            setTimeout(() => {
-                mermaid.init(undefined, document.querySelectorAll('.mermaid'));
-            }, 100);
-        }
-        
-        // Default to overview context
-        this.switchGuideContext('overview');
+        // Reset form
+        ['ticketError','ticketSuccess'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) { el.style.display = 'none'; el.textContent = ''; }
+        });
+        ['ticketType','ticketDescription','ticketEmail'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        document.getElementById('ticketModal').classList.add('active');
     }
 
-    switchGuideContext(context) {
-        // Update tab states
-        document.querySelectorAll('.context-tab').forEach(tab => {
-            tab.classList.remove('active');
-        });
-        const activeTab = document.getElementById(`tab-${context}`);
-        if (activeTab) {
-            activeTab.classList.add('active');
-        }
-        
-        // Update content visibility
-        document.querySelectorAll('.guide-content').forEach(content => {
-            content.style.display = 'none';
-        });
-        const activeContent = document.getElementById(`guide-${context}`);
-        if (activeContent) {
-            activeContent.style.display = 'block';
-        }
-        
-        // Re-render mermaid diagrams for the visible context
-        if (window.mermaid) {
-            setTimeout(() => {
-                mermaid.init(undefined, document.querySelectorAll('.mermaid'));
-            }, 50);
-        }
+    closeTicketModal() {
+        document.getElementById('ticketModal').classList.remove('active');
     }
 
-    showPattern(patternId) {
-        // Update pattern tabs
-        const clickedTab = event.target;
-        document.querySelectorAll('.pattern-tab').forEach(tab => {
-            tab.classList.remove('active');
-        });
-        clickedTab.classList.add('active');
-        
-        // Update pattern content
-        document.querySelectorAll('.pattern-content').forEach(content => {
-            content.style.display = 'none';
-        });
-        const targetContent = document.getElementById(`pattern-${patternId}`);
-        if (targetContent) {
-            targetContent.style.display = 'block';
-        }
-        
-        // Re-render mermaid
-        if (window.mermaid) {
-            setTimeout(() => {
-                mermaid.init(undefined, document.querySelectorAll('.mermaid'));
-            }, 50);
+    async submitTicket() {
+        const type = document.getElementById('ticketType')?.value;
+        const desc = document.getElementById('ticketDescription')?.value?.trim();
+        const email = document.getElementById('ticketEmail')?.value?.trim();
+        const errEl = document.getElementById('ticketError');
+        const sucEl = document.getElementById('ticketSuccess');
+
+        const showErr = (msg) => { errEl.textContent = msg; errEl.style.display = 'block'; sucEl.style.display = 'none'; };
+        errEl.style.display = 'none';
+        sucEl.style.display = 'none';
+
+        if (!type)  return showErr('Please choose a category.');
+        if (!desc)  return showErr('Please enter a description.');
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+            return showErr('Please enter a valid email address.');
+
+        const fd = new FormData();
+        fd.append('ticket_type',  type);
+        fd.append('description',  desc);
+        fd.append('email',        email);
+        fd.append('csrfmiddlewaretoken', this.getCsrfToken());
+
+        try {
+            const res  = await fetch('/create_ticket/', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (data.reference || res.ok) {
+                sucEl.textContent = `Request submitted${data.reference ? ' — Ref: ' + data.reference : ''}. We'll get back to you shortly.`;
+                sucEl.style.display = 'block';
+                setTimeout(() => this.closeTicketModal(), 3000);
+            } else {
+                showErr(data.error || data.detail || 'Could not submit request. Please try again.');
+            }
+        } catch (e) {
+            showErr('Network error. Please try again.');
         }
     }
 
@@ -4011,9 +4003,7 @@ class FeastDiagram {
     }
 
     loadPattern(patternName) {
-        this.showNotification('Loading Pattern', `Importing ${patternName} architecture...`);
-        // Implementation would load predefined architectures
-        document.getElementById('guideModal').classList.remove('active');
+        // Legacy stub — guide replaced with ticket modal
     }
 
     addLLMActionButtons(messageDiv) {

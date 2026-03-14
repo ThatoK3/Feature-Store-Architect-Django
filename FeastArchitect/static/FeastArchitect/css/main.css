@@ -5369,3 +5369,21 @@
             white-space: nowrap;
             flex-shrink: 0;
         }
+
+        /* ── Ticket modal form feedback ── */
+        .form-error {
+            font-size: 12px;
+            color: var(--feast-red);
+            background: rgba(239,68,68,0.08);
+            border: 1px solid rgba(239,68,68,0.2);
+            border-radius: 8px;
+            padding: 8px 12px;
+        }
+        .form-success {
+            font-size: 12px;
+            color: var(--feast-green);
+            background: rgba(16,185,129,0.08);
+            border: 1px solid rgba(16,185,129,0.2);
+            border-radius: 8px;
+            padding: 8px 12px;
+        }
