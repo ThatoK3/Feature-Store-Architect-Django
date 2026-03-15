@@ -58,7 +58,24 @@
             </a>
         </div>
 
-        <div class="ca-divider">Your Repositories</div>
+        <!-- Search + refresh bar -->
+        <div class="ca-repo-toolbar">
+            <div class="ca-search-wrap">
+                <svg class="ca-search-icon" width="13" height="13" viewBox="0 0 16 16" fill="none">
+                    <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M10 10l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                <input id="repoSearch" class="ca-search-input" type="text"
+                    placeholder="Search repositories…"
+                    oninput="filterRepos(this.value)"/>
+            </div>
+            <button class="ca-refresh-btn" onclick="refreshRepos()" title="Refresh">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <path d="M13.5 2.5A6.5 6.5 0 1 1 7 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    <path d="M7 1l2.5 2.5L7 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+        </div>
 
         <!-- Repo list -->
         <div class="ca-repo-list" id="repoList">
@@ -258,6 +275,36 @@ function openNewRepo()  { window.open('/ui/feast?new', '_blank'); }
 function openExample()  { window.open('/ui/feast', '_blank'); }
 
 // ── Helpers ───────────────────────────────────────────
+function filterRepos(query) {
+    const q = query.toLowerCase().trim();
+    if (!q) { renderRepos(repos); return; }
+    renderRepos(repos.filter(r =>
+        r.name.toLowerCase().includes(q) ||
+        (r.default_owner || '').toLowerCase().includes(q) ||
+        (r.description || '').toLowerCase().includes(q)
+    ));
+}
+
+function refreshRepos() {
+    const btn = document.querySelector('.ca-refresh-btn');
+    if (btn) btn.classList.add('ca-refresh-spinning');
+    document.getElementById('repoSearch').value = '';
+    fetch('/api/repositories/')
+        .then(r => { if (!r.ok) throw new Error('Failed'); return r.json(); })
+        .then(data => {
+            repos = Array.isArray(data) ? data : (data.data || []);
+            renderRepos(repos);
+            selectedId = null;
+            pinnedId   = null;
+            document.getElementById('openAppBtn').disabled = true;
+            hideDetail();
+        })
+        .catch(() => {})
+        .finally(() => {
+            if (btn) btn.classList.remove('ca-refresh-spinning');
+        });
+}
+
 function escapeHtml(t) {
     if (!t) return '';
     const d = document.createElement('div');
