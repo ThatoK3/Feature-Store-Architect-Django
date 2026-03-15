@@ -1377,19 +1377,37 @@ class FeastDiagram {
             const data = await response.json();
             
             if (!response.ok) {
-                // Handle specific error cases
                 if (response.status === 409) {
-                    // Conflict detected
-                    document.getElementById('pushStatus').innerHTML = 
-                        `❌ Conflict: ${data.detail || 'Repository modified by another session'}`;
-                    document.getElementById('pushProgress').style.backgroundColor = 'var(--feast-red)';
-                    
-                    // Offer force update option
-                    if (confirm('Conflict detected. Force overwrite server version?')) {
-                        await this.forcePushRepo(payload);
+                    if (!repoId) {
+                        // New repo — name already exists on server
+                        // Fetch the existing repo ID so we can offer to overwrite it
+                        document.getElementById('pushStatus').innerHTML =
+                            `❌ A repository named "${repoName}" already exists.`;
+                        document.getElementById('pushProgress').style.backgroundColor = 'var(--feast-red)';
+                        const existingId = data.existing_id || data.id || null;
+                        if (existingId && confirm(
+                            `A repository named "${repoName}" already exists (ID: ${existingId}).
+
+Overwrite it with your current diagram?`
+                        )) {
+                            this.repoSettings.id = existingId;
+                            await this.forcePushRepo(payload);
+                        } else if (!existingId) {
+                            this.showNotification('Name Taken',
+                                `"${repoName}" already exists. Rename in Settings then push again.`, 'error');
+                            this.showSettings();
+                        }
+                        return;
+                    } else {
+                        // Existing repo — hash conflict
+                        document.getElementById('pushStatus').innerHTML =
+                            `❌ Conflict: ${data.detail || 'Repository modified by another session'}`;
+                        document.getElementById('pushProgress').style.backgroundColor = 'var(--feast-red)';
+                        if (confirm('Conflict detected. Force overwrite server version?')) {
+                            await this.forcePushRepo(payload);
+                        }
                         return;
                     }
-                    return;
                 }
                 throw new Error(data.detail || `HTTP ${response.status}`);
             }
