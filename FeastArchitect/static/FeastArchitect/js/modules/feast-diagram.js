@@ -2275,6 +2275,11 @@ class FeastDiagram {
         const onlineServing = f.serving && f.serving.online;
         const offlineServing = f.serving && f.serving.offline;
 
+        // Resolve datasource name from sourceId
+        const sourceNode = f.sourceId ? this.nodes.nodes.get(f.sourceId) : null;
+        const sourceName = sourceNode ? sourceNode.name : (f.sourceColumn ? f.sourceColumn : null);
+        const sourceIcon = sourceNode && sourceNode.dbType ? sourceNode.dbType.icon : '🗄️';
+
         const typeColors = {
             'Int64':'#60a5fa','Int32':'#60a5fa','Int16':'#60a5fa','Int8':'#60a5fa',
             'Float32':'#f59e0b','Float64':'#f59e0b',
@@ -2309,6 +2314,7 @@ class FeastDiagram {
             </div>
             ${qualBar}
             ${tags.length > 0 ? `<div class="feat-card-tags">${tags.slice(0,4).map(t=>`<span class="feat-tag-chip">#${t}</span>`).join('')}${tags.length>4?`<span class="feat-tag-chip">+${tags.length-4}</span>`:''}</div>` : ''}
+            ${sourceName ? `<div class="feat-source-chip" onclick="event.stopPropagation();${f.sourceId ? `diagram.selectNode('${f.sourceId || ''}');diagram.centerOnNode('${f.sourceId || ''}')` : ''}" title="Source: ${sourceName}">${sourceIcon} <span>${sourceName}</span></div>` : ''}
         </div>`;
     }
 
@@ -6081,6 +6087,19 @@ the registry, online store, and offline store settings.
                     row('Type', f.type) +
                     row('Owner', f.owner) +
                     row('Source Column', f.sourceColumn) +
+                    (() => {
+                        const sn = f.sourceId ? this.nodes.nodes.get(f.sourceId) : null;
+                        if (!sn) return '';
+                        const icon = sn.dbType ? sn.dbType.icon : '🗄️';
+                        return `<div class="fdm-row">
+                            <span class="fdm-label">Data Source</span>
+                            <span class="fdm-value">
+                                <button class="feat-source-nav-btn" onclick="diagram._closeFeatureModal();diagram.selectNode('${f.sourceId}');diagram.centerOnNode('${f.sourceId}')">
+                                    ${icon} ${sn.name} <span style="opacity:0.5;font-size:10px">→</span>
+                                </button>
+                            </span>
+                        </div>`;
+                    })() +
                     row('Default Value', f.defaultValue)
                 )}
                 <div class="fdm-section">
@@ -6345,6 +6364,10 @@ the registry, online store, and offline store settings.
         const rows = [];
         if (f.owner) rows.push(['Owner', f.owner]);
         if (f.sourceColumn) rows.push(['Source col', f.sourceColumn]);
+        if (f.sourceId) {
+            const sn = this.nodes.nodes.get(f.sourceId);
+            if (sn) rows.push(['Datasource', (sn.dbType ? sn.dbType.icon + ' ' : '') + sn.name]);
+        }
         if (f.serving && f.serving.ttl != null) rows.push(['TTL', f.serving.ttl + 's']);
         if (f.quality && f.quality.completeness != null) rows.push(['Completeness', f.quality.completeness + '%']);
         if (f.quality && f.quality.freshness) rows.push(['Freshness', f.quality.freshness]);
