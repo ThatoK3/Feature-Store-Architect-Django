@@ -4,7 +4,7 @@
 <nav class="sg-nav">
     <div class="sg-nav-brand">
         <div class="sg-nav-dot"></div>
-        DataSenseHub
+        FeaureRepos
     </div>
     <div class="sg-nav-right">
         <span class="sg-nav-user">Welcome, {{ username }}</span>
@@ -188,10 +188,6 @@ function showDetail(id, pinned) {
                 <div class="ca-dp-name">${escapeHtml(r.name)}</div>
                 <div class="ca-dp-owner">${escapeHtml(r.default_owner || '—')}</div>
             </div>
-            ${pinnedId === id ? `<button class="ca-dp-open" onclick="openSelected()">
-                Open
-                <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>` : ''}
         </div>
 
         <div class="ca-dp-section">
@@ -229,13 +225,6 @@ function showDetail(id, pinned) {
             <div class="ca-dp-desc">${escapeHtml(desc)}</div>
         </div>
 
-        ${pinnedId === id ? `
-        <div class="ca-dp-section ca-dp-actions-section">
-            <button class="ca-dp-btn-primary" onclick="openSelected()">
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                Open Repository
-            </button>
-        </div>` : ''}
     `;
 }
 
