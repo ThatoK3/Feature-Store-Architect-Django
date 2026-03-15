@@ -4,7 +4,7 @@
 <nav class="sg-nav">
     <div class="sg-nav-brand">
         <div class="sg-nav-dot"></div>
-        FeaureRepos
+        DataSenseHub
     </div>
     <div class="sg-nav-right">
         <span class="sg-nav-user">Welcome, {{ username }}</span>
@@ -188,6 +188,7 @@ function showDetail(id, pinned) {
                 <div class="ca-dp-name">${escapeHtml(r.name)}</div>
                 <div class="ca-dp-owner">${escapeHtml(r.default_owner || '—')}</div>
             </div>
+
         </div>
 
         <div class="ca-dp-section">
@@ -225,6 +226,7 @@ function showDetail(id, pinned) {
             <div class="ca-dp-desc">${escapeHtml(desc)}</div>
         </div>
 
+
     `;
 }
 
@@ -240,11 +242,11 @@ function hideDetail() {
 // ── Navigation ────────────────────────────────────────
 function openSelected() {
     if (!selectedId) return;
-    window.location.href = `/ui/feast?repo_id=${encodeURIComponent(selectedId)}`;
+    window.open(`/ui/feast?repo_id=${encodeURIComponent(selectedId)}`, '_blank');
 }
 
-function openNewRepo()  { window.location.href = '/ui/feast?new'; }
-function openExample()  { window.location.href = '/ui/feast'; }
+function openNewRepo()  { window.open('/ui/feast?new', '_blank'); }
+function openExample()  { window.open('/ui/feast', '_blank'); }
 
 // ── Helpers ───────────────────────────────────────────
 function escapeHtml(t) {
