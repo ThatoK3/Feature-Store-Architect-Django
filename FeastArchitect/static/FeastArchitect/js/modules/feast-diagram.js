@@ -1483,9 +1483,15 @@ Overwrite it with your current diagram?`
             
             try {
                 if (this.repoSettings.id) {
-                    // Backend import
-                    const result = await this.api.importRepository(file);
-                    window.location.href = `/ui/feast?repo_id=${result.id}`;
+                    // Backend import — strip embedded id to force creation of a new repo
+                    const text = await file.text();
+                    const data = JSON.parse(text);
+                    if (data.repository) delete data.repository.id;
+                    const stripped = new File(
+                        [JSON.stringify(data)], file.name, { type: 'application/json' }
+                    );
+                    const result = await this.api.importRepository(stripped);
+                    window.open(`/ui/feast?repo_id=${result.id}`, '_blank');
                 } else {
                     // Local import
                     const text = await file.text();
