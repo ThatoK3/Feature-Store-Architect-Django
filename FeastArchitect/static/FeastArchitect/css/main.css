@@ -2632,10 +2632,10 @@
             bottom: 140px;
             left: 50%;
             transform: translateX(-50%) translateY(16px);
-            width: 775px;
+            width: 530px;
             min-width: 400px;
             max-width: 92vw;
-            height: 775px;
+            height: 590px;
             min-height: 140px;
             max-height: 85vh;
             background: var(--bg-secondary);
